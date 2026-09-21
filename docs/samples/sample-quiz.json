@@ -1,0 +1,109 @@
+{
+  "format": "ictquiz-v1",
+  "quiz": {
+    "title": "ICTWEEK — ICT Basics",
+    "description": "Sample 8-question quiz on ICT topics. Import via POST /api/quizzes/import or the library's Import JSON button.",
+    "questions": [
+      {
+        "type": "SINGLE",
+        "text": "What does \"HTTP\" stand for?",
+        "timeLimitSec": 20,
+        "pointsMode": "STANDARD",
+        "explanation": "HTTP is the protocol browsers use to fetch web pages.",
+        "options": [
+          { "text": "HyperText Transfer Protocol", "isCorrect": true },
+          { "text": "High Throughput Transfer Process", "isCorrect": false },
+          { "text": "HyperText Transmission Program", "isCorrect": false },
+          { "text": "Host To Terminal Protocol", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "TRUE_FALSE",
+        "text": "Uzbekistan's country code top-level domain is .uz",
+        "timeLimitSec": 10,
+        "pointsMode": "STANDARD",
+        "explanation": ".uz has been Uzbekistan's ccTLD since 1995.",
+        "options": [
+          { "text": "True", "isCorrect": true },
+          { "text": "False", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "MULTI",
+        "text": "Which of these are programming languages?",
+        "timeLimitSec": 30,
+        "pointsMode": "DOUBLE",
+        "explanation": "HTML is a markup language, not a programming language.",
+        "options": [
+          { "text": "Python", "isCorrect": true },
+          { "text": "HTML", "isCorrect": false },
+          { "text": "Rust", "isCorrect": true },
+          { "text": "JPEG", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "SINGLE",
+        "text": "Which port does HTTPS use by default?",
+        "timeLimitSec": 20,
+        "pointsMode": "STANDARD",
+        "explanation": "HTTPS (HTTP over TLS) listens on TCP 443; plain HTTP uses 80.",
+        "options": [
+          { "text": "80", "isCorrect": false },
+          { "text": "443", "isCorrect": true },
+          { "text": "22", "isCorrect": false },
+          { "text": "8080", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "MULTI",
+        "text": "Which are valid IPv4 addresses?",
+        "timeLimitSec": 30,
+        "pointsMode": "STANDARD",
+        "explanation": "Each octet must be 0–255, so 256.1.2.3 and 192.168.1 are invalid.",
+        "options": [
+          { "text": "192.168.0.1", "isCorrect": true },
+          { "text": "256.1.2.3", "isCorrect": false },
+          { "text": "10.0.0.254", "isCorrect": true },
+          { "text": "192.168.1", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "TRUE_FALSE",
+        "text": "A password manager makes it safe to reuse the same password everywhere",
+        "timeLimitSec": 10,
+        "pointsMode": "NONE",
+        "explanation": "Reusing passwords is unsafe even with a manager — use a unique one per site.",
+        "options": [
+          { "text": "True", "isCorrect": false },
+          { "text": "False", "isCorrect": true }
+        ]
+      },
+      {
+        "type": "SINGLE",
+        "text": "What does a VPN primarily provide?",
+        "timeLimitSec": 20,
+        "pointsMode": "STANDARD",
+        "explanation": "A VPN creates an encrypted tunnel between your device and the VPN server.",
+        "options": [
+          { "text": "An encrypted tunnel for network traffic", "isCorrect": true },
+          { "text": "Faster Wi-Fi hardware", "isCorrect": false },
+          { "text": "Automatic virus removal", "isCorrect": false },
+          { "text": "A backup of your files", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "MULTI",
+        "text": "Which are open-source operating systems?",
+        "timeLimitSec": 30,
+        "pointsMode": "DOUBLE",
+        "explanation": "Linux and FreeBSD are open source; Windows and macOS are proprietary.",
+        "options": [
+          { "text": "Linux", "isCorrect": true },
+          { "text": "Windows 11", "isCorrect": false },
+          { "text": "FreeBSD", "isCorrect": true },
+          { "text": "macOS", "isCorrect": false }
+        ]
+      }
+    ]
+  }
+}

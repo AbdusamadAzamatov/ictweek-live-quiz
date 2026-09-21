@@ -183,8 +183,11 @@ function attachPlayerHandlers(p: Player, socket: Socket) {
   socket.on('connect_error', (e) => p.errors.push(`connect_error: ${e.message}`));
 }
 
+/** engine.io `ws` does not honour NODE_TLS_REJECT_UNAUTHORIZED — pass it through. */
+const REJECT_UNAUTH = process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0';
+
 function newPlayerSocket(auth: Record<string, unknown>): Socket {
-  return io(URL_, { transports: ['websocket'], auth, reconnection: false, timeout: 20000, forceNew: true });
+  return io(URL_, { transports: ['websocket'], auth, reconnection: false, timeout: 20000, forceNew: true, rejectUnauthorized: REJECT_UNAUTH });
 }
 
 async function joinPlayer(p: Player, pin: string): Promise<void> {
@@ -244,7 +247,7 @@ class Host {
   constructor(sessionId: string) {
     this.socket = io(URL_, {
       transports: ['websocket'], auth: { role: 'host', sessionId }, extraHeaders: { cookie, origin: ORIGIN },
-      reconnection: true, forceNew: true,
+      reconnection: true, forceNew: true, rejectUnauthorized: REJECT_UNAUTH,
     });
     this.socket.on('state', (s: GameSnapshot) => {
       this.snapshot = s;

@@ -27,3 +27,35 @@ pnpm dev          # API on :3000 + web dev server on :5173 (proxied)
 Useful scripts: `pnpm lint` · `pnpm typecheck` · `pnpm test` · `pnpm build`.
 Add organizers later with
 `pnpm --filter @ictquiz/server create-organizer -- <email> <password>`.
+
+## Deploy
+
+Production runs as a three-service compose stack (`docker/`): Postgres
+(unpublished), the app image (multi-stage `docker/Dockerfile`, entrypoint runs
+`prisma migrate deploy`), and Caddy (automatic HTTPS + WebSocket proxy).
+
+```bash
+cp docker/.env.example docker/.env   # set DOMAIN, PUBLIC_URL, secrets
+docker compose -f docker/compose.yml --env-file docker/.env up -d --build
+```
+
+Runbooks in `docs/runbooks/`: [`deploy.md`](docs/runbooks/deploy.md),
+[`backup-restore.md`](docs/runbooks/backup-restore.md),
+[`rollback.md`](docs/runbooks/rollback.md),
+[`event-day.md`](docs/runbooks/event-day.md). Samples in `docs/samples/`
+(`sample-quiz.json`, `import-template.csv`); parity notes in
+[`docs/PARITY_MATRIX.md`](docs/PARITY_MATRIX.md).
+
+## Verification
+
+```bash
+pnpm lint         # eslint across the workspace
+pnpm typecheck    # tsc --noEmit per package
+pnpm test         # vitest per package (server tests need the dev Postgres)
+pnpm build        # shared → server (prisma generate + tsc) → web (vite)
+
+# 50-player live-game load test (dev server or deployed stack):
+pnpm --filter @ictquiz/server load-test -- --players 50 --questions 3 \
+  --time-limit 5 --url http://localhost:3000 --origin http://localhost:5173 \
+  --email admin@example.com --password 'ChangeMe123!'
+```

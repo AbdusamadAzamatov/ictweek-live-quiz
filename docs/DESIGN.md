@@ -21,7 +21,7 @@ Where this file and the plan disagree, this file wins (it records the decisions 
 ├── packages/shared/            # zod schemas, types, scoring, ranking, quiz validation, socket contract
 ├── apps/server/                # Fastify + Socket.IO + Prisma (also serves built web in prod)
 ├── apps/web/                   # React + Vite + Tailwind v4
-├── scripts/                    # load-test, create-organizer
+├── scripts/                    # load-test (create-organizer lives in src/scripts so it ships in dist)
 ├── docker/
 │   ├── compose.dev.yml         # local Postgres only (port 5432) + init sql creating ictquiz_test
 │   ├── Dockerfile              # multi-stage app image
@@ -327,7 +327,7 @@ Sounds: synthesized with WebAudio (no assets): countdown tick, answers-closed, r
 - `docker/Dockerfile`: `node:22-alpine` multi-stage (pnpm fetch → build shared/web/server → runtime with prod deps, prisma client, `apps/web/dist`). Entrypoint runs `prisma migrate deploy` then `node apps/server/dist/index.js`. Non-root user, `MEDIA_DIR=/data/media` volume.
 - `docker/compose.yml`: `db` (postgres:16-alpine, internal only, healthcheck, volume `pgdata`), `app` (depends_on db healthy, volume `media`, healthcheck `/api/health`), `caddy` (caddy:2-alpine, ports 80/443, `Caddyfile` reverse_proxy to `app:3000` — WebSockets pass through by default, volumes `caddy_data`, `caddy_config`). Images pinned by tag+digest in the final package.
 - `docker/.env.example`: `DOMAIN`, `PUBLIC_URL`, `POSTGRES_PASSWORD`, `DATABASE_URL`, `SESSION_SECRET`, `MEDIA_DIR`, `INITIAL_ORGANIZER_EMAIL`, `INITIAL_ORGANIZER_PASSWORD` (bootstrap only when zero organizers exist; remove after first boot), `MAX_UPLOAD_MB=5`, `TRUST_PROXY=1`.
-- `scripts/create-organizer.ts` for adding organizers later.
+- `src/scripts/create-organizer.ts` for adding organizers later.
 - Runbooks: deploy, backup/restore (`pg_dump` + media tar), rollback (previous image tag + `migrate` note), event-day checklist (rehearsal, fallback PIN, projector setup, Wi-Fi).
 
 ## 10. Verification matrix

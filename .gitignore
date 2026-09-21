@@ -8,3 +8,4 @@ apps/server/src/generated/
 *.log
 artifacts/
 load-results/
+backups/

@@ -1,7 +1,7 @@
 import { hash as argonHash } from '@node-rs/argon2';
-import '../src/env.js';
-import { getConfig } from '../src/env.js';
-import { createPrisma } from '../src/lib/db.js';
+import '../env.js';
+import { getConfig } from '../env.js';
+import { createPrisma } from '../lib/db.js';
 
 const [email, password] = process.argv.slice(2);
 if (!email || !password) {

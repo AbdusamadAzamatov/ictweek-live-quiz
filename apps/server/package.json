@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "files": [
+    "dist",
+    "prisma",
+    "prisma.config.ts"
+  ],
   "scripts": {
     "dev": "node --watch --import tsx --conditions=development src/index.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
@@ -11,7 +16,7 @@
     "test": "vitest run",
     "db:migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "create-organizer": "tsx --conditions=development scripts/create-organizer.ts",
+    "create-organizer": "tsx --conditions=development src/scripts/create-organizer.ts",
     "load-test": "tsx --conditions=development scripts/load-test.ts"
   },
   "dependencies": {
@@ -28,13 +33,13 @@
     "file-type": "^22.1.1",
     "image-size": "^2.0.4",
     "pg": "8.23.0",
+    "prisma": "7.10.0",
     "socket.io": "4.8.3",
     "zod": "4.6.0"
   },
   "devDependencies": {
     "@types/node": "26.0.0",
     "@types/pg": "8.15.0",
-    "prisma": "7.10.0",
     "socket.io-client": "4.8.3",
     "tsx": "4.23.13",
     "typescript": "6.0.3",

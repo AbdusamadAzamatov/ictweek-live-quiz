@@ -71,6 +71,9 @@ importers:
       pg:
         specifier: 8.23.0
         version: 8.23.0
+      prisma:
+        specifier: 7.10.0
+        version: 7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       socket.io:
         specifier: 4.8.3
         version: 4.8.3(supports-color@10.2.2)
@@ -84,9 +87,6 @@ importers:
       '@types/pg':
         specifier: 8.15.0
         version: 8.15.0
-      prisma:
-        specifier: 7.10.0
-        version: 7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       socket.io-client:
         specifier: 4.8.3
         version: 4.8.3(supports-color@10.2.2)

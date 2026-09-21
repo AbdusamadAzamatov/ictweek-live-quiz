@@ -660,11 +660,24 @@ export class GameRoom {
   private async end(): Promise<HostCommandResult> {
     if (this.state === 'FINISHED' || this.state === 'CANCELLED') return INVALID_STATE;
     const final: SessionState = this.startedAt ? 'FINISHED' : 'CANCELLED';
+    const attempt = this.attempt;
     if (final === 'FINISHED') this.computeLeaderboard();
     await this.persist({
       state: final,
       set: { activePin: null, endedAt: new Date() },
       event: final === 'FINISHED' ? 'FINISHED' : 'CANCELLED',
+      eventPayload: attempt?.status === 'OPEN' ? { voidedAttemptId: attempt.id } : {},
+      write: async (tx) => {
+        // Ending mid-question voids the open attempt so its unapplied
+        // submissions never leak into reports.
+        if (attempt && attempt.status === 'OPEN') {
+          await tx.questionAttempt.update({
+            where: { id: attempt.id },
+            data: { status: 'VOIDED', closedAt: new Date() },
+          });
+          attempt.status = 'VOIDED';
+        }
+      },
     });
     this.endedAt = new Date();
     this.clearTimers();

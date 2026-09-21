@@ -289,12 +289,12 @@ export function HostPage() {
           <Panel className="flex flex-col items-center gap-4 text-center">
             {(snap.state === 'LOBBY' || running) && (
               <div className="flex items-center gap-6">
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-xs tracking-widest text-white/50 uppercase">PIN</p>
                   <PinDisplay pin={snap.pin} />
                 </div>
                 <HostQr url={snap.joinUrl} />
-                <div className="text-left text-white/70">
+                <div className="w-40 shrink-0 text-left text-white/70">
                   <p>{snap.participantCount} players</p>
                   <p>{snap.locked ? 'Lobby locked' : 'Lobby open'}</p>
                   <button

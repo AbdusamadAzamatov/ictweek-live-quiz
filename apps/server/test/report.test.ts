@@ -207,4 +207,47 @@ describe('session report', () => {
     });
     expect(foreignCsv.statusCode).toBe(404);
   });
+
+  it('voids the open attempt when the host ends mid-question', async () => {
+    const { app, url } = await liveApp({ countdownMs: 100 });
+    apps.push(app);
+    const org = await createOrganizer(`r-${randomUUID()}@example.com`, 'Password123!');
+    const sid = await loginAs(app, org.email, 'Password123!');
+    const quizId = await createPlayableQuiz(app, sid);
+    const session = await createSession(app, sid, quizId);
+
+    const host = track(await hostClient(url, sid, session.id));
+    const p1 = track(await joinPlayer(url, session.pin, 'P1'));
+    track(await joinPlayer(url, session.pin, 'P2'));
+
+    await cmd(host, 'c1', 'START');
+    const open1 = await waitForState(host.snaps, 'QUESTION_OPEN');
+    const att1 = open1.question!.attemptId;
+    await answer(p1, att1, 'end-p1-q1', [open1.question!.options[0]!.id]);
+    const endAck = await cmd(host, 'c2', 'END');
+    expect(endAck.ok).toBe(true);
+    await waitForState(host.snaps, 'FINISHED');
+
+    const attempt = await prisma.questionAttempt.findUniqueOrThrow({ where: { id: att1 } });
+    expect(attempt.status).toBe('VOIDED');
+    expect(attempt.closedAt).not.toBeNull();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/sessions/${session.id}/report`,
+      headers: { cookie: `sid=${sid}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const report = res.json() as Report;
+    expect(report.questions).toHaveLength(0);
+    expect(report.responses).toHaveLength(0);
+    for (const s of report.standings) {
+      expect(s.score, s.nickname).toBe(0);
+      const agg = await prisma.submission.aggregate({
+        _sum: { points: true },
+        where: { participantId: s.participantId, attempt: { status: { not: 'VOIDED' } } },
+      });
+      expect(s.score).toBe(agg._sum.points ?? 0);
+    }
+  });
 });
