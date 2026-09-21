@@ -99,7 +99,13 @@ export class RoomManager {
 
   diagnostics(): {
     active: number;
-    list: Array<{ sessionId: string; pin: string; state: string; participants: number }>;
+    list: Array<{
+      sessionId: string;
+      pin: string;
+      state: string;
+      participants: number;
+      connectedSockets: number;
+    }>;
   } {
     return {
       active: this.rooms.size,
@@ -108,6 +114,7 @@ export class RoomManager {
         pin: r.pin,
         state: r.getState(),
         participants: r.participantCount(),
+        connectedSockets: r.connectedSocketCount(),
       })),
     };
   }

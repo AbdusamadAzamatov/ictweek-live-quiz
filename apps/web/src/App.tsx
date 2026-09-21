@@ -9,6 +9,7 @@ import { QuizEditorPage } from './pages/admin/QuizEditorPage';
 import { QuizPreviewPage } from './pages/admin/QuizPreviewPage';
 import { SessionNewPage } from './pages/admin/SessionNewPage';
 import { HostPage } from './pages/admin/HostPage';
+import { SessionReportPage } from './pages/admin/SessionReportPage';
 import { DiagnosticsPage } from './pages/admin/DiagnosticsPage';
 import { RequireAuth } from './components/RequireAuth';
 import { AdminLayout } from './components/AdminLayout';
@@ -67,6 +68,14 @@ export function App() {
           element={
             <Admin>
               <HostPage />
+            </Admin>
+          }
+        />
+        <Route
+          path="/admin/sessions/:id/report"
+          element={
+            <Admin>
+              <SessionReportPage />
             </Admin>
           }
         />

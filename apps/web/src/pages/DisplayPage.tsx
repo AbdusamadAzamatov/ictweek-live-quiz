@@ -5,6 +5,7 @@ import type { GameSnapshot } from '@ictquiz/shared';
 import { useLive, useServerNow } from '../live/store';
 import { connectLive, disconnectLive } from '../live/socket';
 import { answerStyle } from '../lib/answers';
+import { useSounds } from '../lib/sound';
 import { PinDisplay } from '../components/PinDisplay';
 import { TimerRing } from '../components/TimerRing';
 
@@ -62,11 +63,16 @@ function Lobby({ snap, lobby }: { snap: GameSnapshot; lobby: { count: number; pa
         {snap.participantCount} player{snap.participantCount === 1 ? '' : 's'} in the lobby
       </p>
       <div className="flex max-w-5xl flex-wrap justify-center gap-3">
-        {names.map((p) => (
+        {names.slice(0, 60).map((p) => (
           <span key={p.id} className="rounded-full bg-white/10 px-4 py-2 text-xl font-bold">
             {p.nickname}
           </span>
         ))}
+        {names.length > 60 && (
+          <span className="rounded-full bg-white/20 px-4 py-2 text-xl font-bold text-white/70">
+            +{names.length - 60} more
+          </span>
+        )}
       </div>
       {snap.locked && <p className="text-warning">Lobby is locked</p>}
     </div>
@@ -96,10 +102,14 @@ function QuestionOpen({
     <div className="flex w-full flex-col items-center gap-6">
       <div className="flex w-full max-w-6xl items-start justify-between gap-6">
         <h1 className="flex-1 text-4xl font-black">{q.text}</h1>
-        <TimerRing fraction={fraction} seconds={seconds} size={110} />
+        <TimerRing fraction={fraction} seconds={seconds} size={110} danger={seconds <= 5} />
       </div>
       {q.media && (
-        <img src={q.media.url} alt={q.media.alt} className="max-h-72 rounded-panel object-contain" />
+        <img
+          src={q.media.url}
+          alt={q.media.alt}
+          className="max-h-[40vh] max-w-full rounded-panel object-contain"
+        />
       )}
       <div
         className={`grid w-full max-w-6xl gap-4 ${q.options.length <= 2 ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}
@@ -118,7 +128,7 @@ function QuestionOpen({
                 <img
                   src={o.media.url}
                   alt={o.media.alt}
-                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                  className="max-h-[40vh] w-auto max-w-48 shrink-0 rounded-lg object-contain"
                 />
               )}
               <span className="min-w-0 flex-1 break-words">{o.text}</span>
@@ -127,7 +137,10 @@ function QuestionOpen({
         })}
       </div>
       <p className="text-xl text-white/70">
-        {answered} / {eligible} answered
+        <span key={answered} className="counter-pop font-black text-white">
+          {answered}
+        </span>{' '}
+        / {eligible} answered
       </p>
     </div>
   );
@@ -163,7 +176,7 @@ function AnswerReveal({ snap }: { snap: GameSnapshot }) {
                   <img
                     src={o.media.url}
                     alt={o.media.alt}
-                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                    className="max-h-[40vh] w-auto max-w-40 shrink-0 rounded-lg object-contain"
                   />
                 )}
                 <span className="min-w-0 flex-1 break-words">{o.text}</span>
@@ -262,6 +275,7 @@ export function DisplayPage() {
   const status = useLive((s) => s.status);
   const lobby = useLive((s) => s.lobby);
   const progress = useLive((s) => s.progress);
+  const { needsTap } = useSounds(snapshot);
   useIdleCursor();
 
   useEffect(() => {
@@ -323,6 +337,13 @@ export function DisplayPage() {
         <div className="fixed inset-x-0 top-4 flex justify-center">
           <span className="rounded-full bg-warning px-4 py-1 font-bold text-navy">
             Reconnecting…
+          </span>
+        </div>
+      )}
+      {needsTap && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2">
+          <span className="rounded-full bg-cyan px-5 py-2 font-bold text-navy">
+            Tap to enable sound
           </span>
         </div>
       )}

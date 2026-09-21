@@ -17,9 +17,25 @@ type SessionListItem = {
   id: string;
   pin: string;
   state: string;
+  locked: boolean;
   participantCount: number;
+  questionCount: number;
   createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  displayKey: string;
   title: string;
+};
+
+const STATE_TONE: Record<string, string> = {
+  LOBBY: 'bg-azure/20 text-azure',
+  COUNTDOWN: 'bg-cyan/20 text-cyan',
+  QUESTION_OPEN: 'bg-cyan/20 text-cyan',
+  ANSWER_REVEAL: 'bg-warning/20 text-warning',
+  LEADERBOARD: 'bg-warning/20 text-warning',
+  RECOVERY: 'bg-warning/20 text-warning',
+  FINISHED: 'bg-success/20 text-success',
+  CANCELLED: 'bg-white/10 text-white/50',
 };
 
 export function LibraryPage() {
@@ -146,21 +162,43 @@ export function LibraryPage() {
           <Panel className="text-white/60">No sessions yet.</Panel>
         )}
         <div className="grid gap-3">
-          {sessions.data?.sessions.map((s) => (
-            <Panel key={s.id} className="flex items-center gap-4">
-              <span className="font-mono text-2xl font-black tracking-widest">{s.pin}</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold">{s.title}</p>
-                <p className="text-sm text-white/50">
-                  {s.state} · {s.participantCount} players ·{' '}
-                  {new Date(s.createdAt).toLocaleString()}
-                </p>
-              </div>
-              <Button variant="ghost" onClick={() => navigate(`/admin/host/${s.id}`)}>
-                Open
-              </Button>
-            </Panel>
-          ))}
+          {sessions.data?.sessions.map((s) => {
+            const live = s.state !== 'FINISHED' && s.state !== 'CANCELLED';
+            return (
+              <Panel key={s.id} className="flex flex-wrap items-center gap-4">
+                <span className="font-mono text-2xl font-black tracking-widest">{s.pin}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{s.title || 'Untitled quiz'}</p>
+                  <p className="text-sm text-white/50">
+                    <span
+                      className={`mr-2 rounded-full px-2 py-0.5 text-xs font-bold ${STATE_TONE[s.state] ?? 'bg-white/10'}`}
+                    >
+                      {s.state}
+                    </span>
+                    {s.participantCount} players · {s.questionCount} questions ·{' '}
+                    {s.startedAt ? `started ${new Date(s.startedAt).toLocaleString()}` : `created ${new Date(s.createdAt).toLocaleString()}`}
+                    {s.endedAt ? ` · ended ${new Date(s.endedAt).toLocaleString()}` : ''}
+                  </p>
+                </div>
+                {live && (
+                  <Button variant="primary" onClick={() => navigate(`/admin/host/${s.id}`)}>
+                    Open host
+                  </Button>
+                )}
+                {s.startedAt && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate(`/admin/sessions/${s.id}/report`)}
+                  >
+                    Report
+                  </Button>
+                )}
+                <a href={`/display/${s.displayKey}`} target="_blank" rel="noreferrer">
+                  <Button variant="ghost">Projector</Button>
+                </a>
+              </Panel>
+            );
+          })}
         </div>
       </section>
     </div>

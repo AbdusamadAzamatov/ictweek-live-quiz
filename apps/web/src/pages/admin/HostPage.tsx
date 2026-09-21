@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import QRCode from 'qrcode';
 import {
   EV,
   type GameSnapshot,
@@ -9,7 +10,9 @@ import {
 import { useLive, useServerNow } from '../../live/store';
 import { connectLive, disconnectLive, emitAck } from '../../live/socket';
 import { answerStyle } from '../../lib/answers';
+import { useSounds } from '../../lib/sound';
 import { Button } from '../../components/Button';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Panel } from '../../components/Panel';
 import { PinDisplay } from '../../components/PinDisplay';
 import { TimerRing } from '../../components/TimerRing';
@@ -30,31 +33,13 @@ function useCommand(): (type: HostCommandType, participantId?: string) => Promis
   }, []);
 }
 
-function ConfirmButton({
-  label,
-  confirm,
-  onConfirm,
-  variant = 'ghost',
-  disabled,
-}: {
-  label: string;
-  confirm: string;
-  onConfirm: () => void;
-  variant?: 'primary' | 'ghost' | 'danger';
-  disabled?: boolean;
-}) {
-  return (
-    <Button
-      variant={variant}
-      disabled={disabled}
-      onClick={() => {
-        if (window.confirm(confirm)) onConfirm();
-      }}
-    >
-      {label}
-    </Button>
-  );
-}
+type ConfirmRequest = {
+  title: string;
+  body?: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  run: () => void;
+};
 
 function StatusPill() {
   const status = useLive((s) => s.status);
@@ -69,7 +54,10 @@ function StatusPill() {
   );
 }
 
-function PlayerList({ snap, command }: Props & { command: ReturnType<typeof useCommand> }) {
+function PlayerList({
+  snap,
+  onRemove,
+}: Props & { onRemove: (p: { id: string; nickname: string }) => void }) {
   const players = snap.host?.participants ?? [];
   if (players.length === 0) return <p className="text-white/50">No players yet.</p>;
   return (
@@ -89,11 +77,7 @@ function PlayerList({ snap, command }: Props & { command: ReturnType<typeof useC
             type="button"
             aria-label={`Remove ${p.nickname}`}
             className="rounded-lg px-2 text-white/50 hover:bg-white/10 hover:text-danger"
-            onClick={() => {
-              if (window.confirm(`Remove ${p.nickname} from the game?`)) {
-                void command('REMOVE_PARTICIPANT', p.id);
-              }
-            }}
+            onClick={() => onRemove(p)}
           >
             ×
           </button>
@@ -103,13 +87,33 @@ function PlayerList({ snap, command }: Props & { command: ReturnType<typeof useC
   );
 }
 
+function HostQr({ url }: { url: string }) {
+  const [qr, setQr] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    QRCode.toDataURL(url, { margin: 1, width: 120 }).then(
+      (u) => live && setQr(u),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [url]);
+  if (!qr) return null;
+  return <img src={qr} alt="QR code to join" className="h-24 w-24 rounded-lg bg-white p-1" />;
+}
+
 export function HostPage() {
   const { id = '' } = useParams();
   const snapshot = useLive((s) => s.snapshot);
   const progress = useLive((s) => s.progress);
   const command = useCommand();
   const serverNow = useServerNow(250);
+  const { muted, toggleMute } = useSounds(snapshot);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [startAnyway, setStartAnyway] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     connectLive({ role: 'host', sessionId: id });
@@ -138,6 +142,8 @@ export function HostPage() {
       } else if (e.key.toLowerCase() === 'f') {
         if (document.fullscreenElement) void document.exitFullscreen();
         else void document.documentElement.requestFullscreen();
+      } else if (e.key === '?') {
+        setShowHelp((v) => !v);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -165,16 +171,7 @@ export function HostPage() {
     controls.push(
       <Button
         key="start"
-        onClick={() => {
-          if (snap.participantCount === 0 && !startAnyway) {
-            setStartAnyway(true);
-            if (window.confirm('No players have joined yet. Start anyway?')) {
-              void command('START');
-            }
-            return;
-          }
-          void command('START');
-        }}
+        onClick={() => void command('START')}
         disabled={snap.participantCount === 0 && !startAnyway}
       >
         Start game
@@ -185,7 +182,17 @@ export function HostPage() {
         <button
           key="anyway"
           className="text-sm text-white/50 underline"
-          onClick={() => setStartAnyway(true)}
+          onClick={() =>
+            setConfirm({
+              title: 'No players have joined yet',
+              body: 'Start the game anyway?',
+              confirmLabel: 'Start anyway',
+              run: () => {
+                setStartAnyway(true);
+                void command('START');
+              },
+            })
+          }
         >
           start anyway
         </button>,
@@ -224,13 +231,21 @@ export function HostPage() {
   }
   if (running) {
     controls.push(
-      <ConfirmButton
+      <Button
         key="end"
         variant="danger"
-        label="End session"
-        confirm="End this session for everyone?"
-        onConfirm={() => void command('END')}
-      />,
+        onClick={() =>
+          setConfirm({
+            title: 'End session',
+            body: 'End this session for everyone?',
+            confirmLabel: 'End session',
+            danger: true,
+            run: () => void command('END'),
+          })
+        }
+      >
+        End session
+      </Button>,
     );
   }
 
@@ -247,6 +262,16 @@ export function HostPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="ghost" className="px-3 py-1 text-sm" onClick={toggleMute}>
+            {muted ? '🔇 Sound off' : '🔊 Sound on'}
+          </Button>
+          <button
+            className="rounded-lg border border-white/20 px-2 py-1 text-sm text-white/60 hover:text-white"
+            title="Keyboard shortcuts"
+            onClick={() => setShowHelp((v) => !v)}
+          >
+            ?
+          </button>
           <StatusPill />
           <a
             href={`/display/${snap.host?.displayKey ?? ''}`}
@@ -268,9 +293,21 @@ export function HostPage() {
                   <p className="text-xs tracking-widest text-white/50 uppercase">PIN</p>
                   <PinDisplay pin={snap.pin} />
                 </div>
+                <HostQr url={snap.joinUrl} />
                 <div className="text-left text-white/70">
                   <p>{snap.participantCount} players</p>
                   <p>{snap.locked ? 'Lobby locked' : 'Lobby open'}</p>
+                  <button
+                    className="mt-1 text-sm text-cyan underline"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(snap.joinUrl).then(() => {
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      });
+                    }}
+                  >
+                    {copied ? 'Copied!' : 'Copy join link'}
+                  </button>
                 </div>
               </div>
             )}
@@ -369,9 +406,9 @@ export function HostPage() {
             {snap.state === 'FINISHED' && (
               <Link
                 to={`/admin/sessions/${snap.sessionId}/report`}
-                className="text-cyan underline"
+                className="font-bold text-cyan underline"
               >
-                Open report (coming in Phase 4)
+                Open report →
               </Link>
             )}
           </Panel>
@@ -381,9 +418,47 @@ export function HostPage() {
 
         <Panel className="h-fit">
           <h2 className="mb-3 text-xl font-black">Players ({snap.participantCount})</h2>
-          <PlayerList snap={snap} command={command} />
+          <PlayerList
+            snap={snap}
+            onRemove={(p) =>
+              setConfirm({
+                title: `Remove ${p.nickname}?`,
+                body: 'They will be disconnected and cannot rejoin with the same device session.',
+                confirmLabel: 'Remove',
+                danger: true,
+                run: () => void command('REMOVE_PARTICIPANT', p.id),
+              })
+            }
+          />
         </Panel>
       </div>
+
+      {showHelp && (
+        <Panel className="fixed bottom-4 right-4 z-40 w-72 text-sm">
+          <p className="mb-2 font-black">Keyboard shortcuts</p>
+          <ul className="flex flex-col gap-1 text-white/70">
+            <li><b>Space / → / N</b> — primary action (start / next / replay)</li>
+            <li><b>C</b> — close answers</li>
+            <li><b>L</b> — lock / unlock lobby</li>
+            <li><b>M</b> — sound on / off</li>
+            <li><b>F</b> — fullscreen</li>
+            <li><b>?</b> — this panel</li>
+          </ul>
+        </Panel>
+      )}
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={confirm?.title ?? ''}
+        body={confirm?.body}
+        confirmLabel={confirm?.confirmLabel}
+        danger={confirm?.danger}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          confirm?.run();
+          setConfirm(null);
+        }}
+      />
     </div>
   );
 }

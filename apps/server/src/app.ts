@@ -19,6 +19,7 @@ import { authRoutes } from './routes/auth.js';
 import { quizRoutes } from './routes/quizzes.js';
 import { mediaRoutes } from './routes/media.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { reportRoutes } from './routes/reports.js';
 import { publicRoutes } from './routes/public.js';
 
 declare module 'fastify' {
@@ -47,8 +48,16 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   const config: AppConfig = { ...getConfig(), ...opts.config };
   const prisma = opts.prisma ?? createPrisma(config.databaseUrl);
 
+  const logger = opts.logger ?? config.isProduction;
   const app = fastify({
-    logger: opts.logger ?? config.isProduction,
+    // Never let credential material (sid cookie, bearer tokens) into request logs.
+    logger:
+      logger === false
+        ? false
+        : {
+            level: 'info',
+            redact: ['req.headers.cookie', 'req.headers.authorization'],
+          },
     trustProxy: process.env.TRUST_PROXY === '1',
     // Socket.IO keeps long-lived connections open; force-close them on shutdown
     // so app.close() doesn't hang waiting for polling/ws sockets to drain.
@@ -109,7 +118,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   app.setErrorHandler((err: FastifyError, req, reply) => {
     const status = err.statusCode ?? 500;
     if (status >= 500) {
-      recordError(err);
+      recordError(err, 'http');
       req.log.error({ err }, 'request failed');
     }
     const issues = (err as { issues?: unknown }).issues;
@@ -155,6 +164,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       await api.register(quizRoutes);
       await api.register(mediaRoutes);
       await api.register(sessionRoutes);
+      await api.register(reportRoutes);
       await api.register(publicRoutes);
     },
     { prefix: '/api' },
@@ -169,7 +179,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     try {
       await app.rooms.restore();
     } catch (e) {
-      recordError(e);
+      recordError(e, 'engine');
     }
   });
 

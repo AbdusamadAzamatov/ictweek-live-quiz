@@ -31,18 +31,26 @@ function sessionSummary(s: {
   state: string;
   locked: boolean;
   createdAt: Date;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  displayKey: string;
   quizSnapshot: unknown;
   quiz: { title: string } | null;
   _count?: { participants: number };
 }) {
+  const snapshot = s.quizSnapshot as QuizSnapshot | null;
   return {
     id: s.id,
     pin: s.pin,
     state: s.state,
     locked: s.locked,
     createdAt: s.createdAt,
+    startedAt: s.startedAt,
+    endedAt: s.endedAt,
+    displayKey: s.displayKey,
     participantCount: s._count?.participants ?? 0,
-    title: (s.quizSnapshot as QuizSnapshot | null)?.title ?? s.quiz?.title ?? '',
+    questionCount: snapshot?.questions.length ?? 0,
+    title: snapshot?.title ?? s.quiz?.title ?? '',
   };
 }
 

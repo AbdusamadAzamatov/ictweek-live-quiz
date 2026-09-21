@@ -263,6 +263,16 @@ export class GameRoom {
     return this.activeCount();
   }
 
+  /** Live sockets attached to this session across all roles (diagnostics). */
+  connectedSocketCount(): number {
+    let n = 0;
+    for (const p of this.participants.values()) n += p.sockets.size;
+    const adapter = this.deps.io.of('/').adapter;
+    n += adapter.rooms.get(`s:${this.sessionId}:host`)?.size ?? 0;
+    n += adapter.rooms.get(`s:${this.sessionId}:display`)?.size ?? 0;
+    return n;
+  }
+
   getRevision(): number {
     return this.revision;
   }

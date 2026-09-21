@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { csvCell, csvToQuestionDrafts, parseCsv, CSV_TEMPLATE } from '../src/csv.js';
+import {
+  csvCell,
+  csvQuotedCell,
+  csvToQuestionDrafts,
+  parseCsv,
+  serializeCsv,
+  CSV_TEMPLATE,
+} from '../src/csv.js';
 
 describe('parseCsv', () => {
   it('parses simple rows', () => {
@@ -49,6 +56,33 @@ describe('csvCell', () => {
   });
   it('leaves plain cells alone', () => {
     expect(csvCell('hello')).toBe('hello');
+  });
+});
+
+describe('serializeCsv (report serializer)', () => {
+  it('quotes every field and escapes embedded quotes', () => {
+    expect(serializeCsv([['hello', 'a,b', 'say "x"', 'line\nbreak']])).toBe(
+      '"hello","a,b","say ""x""","line\nbreak"\r\n',
+    );
+  });
+  it('prefixes every dangerous leading character', () => {
+    for (const ch of ['=', '+', '-', '@', '\t', '\r']) {
+      expect(csvQuotedCell(`${ch}cmd`)).toBe(`"'${ch}cmd"`);
+    }
+    expect(csvQuotedCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
+  });
+  it('quotes numbers without prefixing them', () => {
+    expect(serializeCsv([[1, 2.5, 0]])).toBe('"1","2.5","0"\r\n');
+  });
+  it('round-trips through parseCsv (CRLF handled)', () => {
+    const rows = [
+      ['Nick,name', 'Q1', 'A; C', '12'],
+      ['=SUM(1)', 'x"y', 'line\nbreak', '0'],
+    ];
+    expect(parseCsv(serializeCsv(rows))).toEqual([
+      ['Nick,name', 'Q1', 'A; C', '12'],
+      ["'=SUM(1)", 'x"y', 'line\nbreak', '0'],
+    ]);
   });
 });
 

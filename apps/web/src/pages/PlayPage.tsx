@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { EV, type PlayerAnswerResult } from '@ictquiz/shared';
 import { useLive } from '../live/store';
 import {
@@ -40,10 +40,13 @@ export function PlayPage() {
   } | null>(null);
 
   const creds = loadStoredPlayer();
+  const [params] = useSearchParams();
+  const pinParam = params.get('pin') ?? '';
 
   useEffect(() => {
     if (!creds) {
-      navigate('/', { replace: true });
+      // Deep link: /play?pin=123456 with no stored player goes to join.
+      navigate(pinParam ? `/join/${pinParam}` : '/', { replace: true });
       return;
     }
     connectLive({
@@ -243,9 +246,13 @@ export function PlayPage() {
               {r ? (r.correct ? 'Correct!' : 'Incorrect') : 'No answer'}
             </h1>
             {r && r.points > 0 && (
-              <p className="text-3xl font-black text-cyan">+{r.points}</p>
+              <p key={snapshot.revision} className="counter-pop text-3xl font-black text-cyan">
+                +{r.points}
+              </p>
             )}
-            {r && r.streak > 1 && <p className="mt-1 text-white/70">Streak ×{r.streak}</p>}
+            {r && r.streak > 1 && (
+              <p className="counter-pop mt-1 text-white/70">Streak ×{r.streak}</p>
+            )}
             {question?.explanation && (
               <p className="mt-4 text-white/70">{question.explanation}</p>
             )}
@@ -273,7 +280,7 @@ export function PlayPage() {
       case 'FINISHED':
         body = (
           <>
-            <h1 className="mb-2 text-4xl font-black">Game over</h1>
+            <h1 className="mb-2 text-4xl font-black">Thanks for playing</h1>
             <p className="text-2xl">
               Final rank <span className="font-black text-cyan">#{me?.rank ?? '—'}</span> ·{' '}
               {me?.score ?? 0} pts

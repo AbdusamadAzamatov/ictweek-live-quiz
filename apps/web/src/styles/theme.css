@@ -112,6 +112,24 @@ body {
   animation: countdown-drain 5s linear both;
 }
 
+/* Answered counter + points pop (display/player) */
+@keyframes counter-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.counter-pop {
+  display: inline-block;
+  animation: counter-pop 0.35s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

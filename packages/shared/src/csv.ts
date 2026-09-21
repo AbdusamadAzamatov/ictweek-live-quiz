@@ -74,6 +74,23 @@ export function csvRow(cells: Array<string | number>): string {
 }
 
 // ---------------------------------------------------------------------------
+// Report serializer — every field is quoted, and any field whose first
+// character is one of = + - @ \t \r is prefixed with a single quote so a
+// spreadsheet can't interpret it as a formula.
+// ---------------------------------------------------------------------------
+
+export function csvQuotedCell(value: string | number): string {
+  const raw = String(value);
+  const v = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return `"${v.replace(/"/g, '""')}"`;
+}
+
+/** Rows → CSV text with CRLF line endings and a trailing newline. */
+export function serializeCsv(rows: Array<Array<string | number>>): string {
+  return rows.map((r) => r.map(csvQuotedCell).join(',')).join('\r\n') + '\r\n';
+}
+
+// ---------------------------------------------------------------------------
 // Question rows → drafts
 // ---------------------------------------------------------------------------
 

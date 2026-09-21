@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { api, ApiError } from '../lib/api';
 import { Button } from '../components/Button';
 import { Panel } from '../components/Panel';
 
 export function JoinPage() {
-  const [pin, setPin] = useState('');
+  const [params] = useSearchParams();
+  const [pin, setPin] = useState(() => (params.get('pin') ?? '').replace(/\D/g, '').slice(0, 6));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
@@ -38,7 +39,9 @@ export function JoinPage() {
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
             inputMode="numeric"
+            pattern="[0-9]*"
             autoComplete="off"
+            autoFocus
             placeholder="Game PIN"
             className="rounded-xl border border-white/15 bg-navy/70 px-4 py-4 text-center text-3xl font-black tracking-[0.3em] outline-none placeholder:text-white/25 focus:border-cyan"
           />

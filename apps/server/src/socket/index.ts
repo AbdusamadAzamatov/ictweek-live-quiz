@@ -59,7 +59,7 @@ export function attachSockets(app: FastifyInstance): void {
     io,
     countdownMs: app.config.countdownMs,
     publicUrl: app.config.publicUrl,
-    recordError,
+    recordError: (e: unknown) => recordError(e, 'engine'),
     onTerminal: (sessionId) => managerRef.current?.scheduleEvict(sessionId),
   });
   managerRef.current = rooms;
@@ -146,7 +146,7 @@ export function attachSockets(app: FastifyInstance): void {
       socket.data = { role: 'display', sessionId: session.id } satisfies SocketData;
       return next();
     } catch (e) {
-      recordError(e);
+      recordError(e, 'socket');
       next(new Error('UNAUTHORIZED'));
     }
   });
@@ -167,7 +167,7 @@ export function attachSockets(app: FastifyInstance): void {
           room.attachSocket(data.participantId, socket.id);
           app.prisma.participant
             .update({ where: { id: data.participantId }, data: { lastSeenAt: new Date() } })
-            .catch(recordError);
+            .catch((e) => recordError(e, 'socket'));
           socket.emit(EV.State, room.buildSnapshot('player', data.participantId));
         } else {
           socket.emit(EV.State, room.buildSnapshot(data.role));
@@ -175,7 +175,7 @@ export function attachSockets(app: FastifyInstance): void {
           socket.emit(EV.LobbyParticipants, room.lobbyPayload());
         }
       } catch (e) {
-        recordError(e);
+        recordError(e, 'socket');
       }
     })();
 
@@ -230,7 +230,7 @@ export function attachSockets(app: FastifyInstance): void {
             where: { id: result.participantId },
             data: { lastSeenAt: new Date() },
           })
-          .catch(recordError);
+          .catch((e) => recordError(e, 'socket'));
         ack({
           ok: true,
           participantId: result.participantId,
@@ -239,7 +239,7 @@ export function attachSockets(app: FastifyInstance): void {
           snapshot: room.buildSnapshot('player', result.participantId),
         } satisfies PlayerJoinResult);
       } catch (e) {
-        recordError(e);
+        recordError(e, 'socket');
         if (isAck(ack)) ack({ ok: false, code: 'ENDED' } satisfies PlayerJoinResult);
       }
     });
@@ -269,7 +269,7 @@ export function attachSockets(app: FastifyInstance): void {
         const result = await room.submit(d.participantId, parsed.data, receivedAt);
         ack(result);
       } catch (e) {
-        recordError(e);
+        recordError(e, 'socket');
         if (isAck(ack)) {
           ack({ status: 'rejected', reason: 'INVALID' } satisfies PlayerAnswerResult);
         }
@@ -290,7 +290,7 @@ export function attachSockets(app: FastifyInstance): void {
         const room = await rooms.getOrLoad(d.sessionId);
         ack(await room.handleCommand(parsed.data));
       } catch (e) {
-        recordError(e);
+        recordError(e, 'socket');
         if (isAck(ack)) ack({ ok: false, code: 'INVALID' } satisfies HostCommandResult);
       }
     });
@@ -308,7 +308,7 @@ export function attachSockets(app: FastifyInstance): void {
           snapshot: room.buildSnapshot(d.role, d.participantId),
         } satisfies StateSyncResult);
       } catch (e) {
-        recordError(e);
+        recordError(e, 'socket');
         if (isAck(ack)) ack({ ok: false, code: 'INVALID' } satisfies StateSyncResult);
       }
     });
