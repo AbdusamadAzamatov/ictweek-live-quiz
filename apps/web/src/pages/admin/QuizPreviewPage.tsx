@@ -49,8 +49,9 @@ export function QuizPreviewPage() {
   const q = questions[qi];
 
   // Local countdown; deadline ends the question even without an answer.
+  // Content slides have no timer — the host (here: the previewer) advances.
   useEffect(() => {
-    if (!q || stage.kind !== 'question') return;
+    if (!q || q.type === 'CONTENT' || stage.kind !== 'question') return;
     openedAt.current = Date.now();
     setTimeLeft(q.timeLimitSec);
     const t = setInterval(() => {
@@ -78,8 +79,10 @@ export function QuizPreviewPage() {
     );
     setAnswered(ids);
     setResult(scored);
-    setScore((s) => s + scored.points);
-    if (scored.isCorrect) setCorrectCount((c) => c + 1);
+    if (q.type !== 'POLL') {
+      setScore((s) => s + scored.points);
+      if (scored.isCorrect) setCorrectCount((c) => c + 1);
+    }
     setStage({ kind: 'reveal' });
   };
 
@@ -124,12 +127,24 @@ export function QuizPreviewPage() {
           <h1 className="text-4xl font-black">Preview finished</h1>
           <p className="text-2xl">
             Score <span className="font-black text-cyan">{score}</span> · {correctCount}/
-            {questions.length} correct
+            {questions.filter((x) => x.type !== 'POLL' && x.type !== 'CONTENT').length}{' '}
+            correct
           </p>
           <Button onClick={restart}>Play again</Button>
         </Panel>
       ) : !q ? (
         <Panel className="text-white/60">This quiz has no questions yet.</Panel>
+      ) : q.type === 'CONTENT' ? (
+        <Panel className="flex flex-col gap-4">
+          <span className="text-sm text-white/50">
+            Slide {qi + 1} of {questions.length}
+          </span>
+          <h1 className="text-3xl font-black">{q.text}</h1>
+          {q.explanation && <p className="text-lg text-white/80">{q.explanation}</p>}
+          <Button onClick={next}>
+            {qi + 1 >= questions.length ? 'See summary' : 'Next'}
+          </Button>
+        </Panel>
       ) : stage.kind === 'question' ? (
         <Panel className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -169,11 +184,19 @@ export function QuizPreviewPage() {
       ) : (
         <Panel className="flex flex-col items-center gap-4 py-8 text-center">
           <h1
-            className={`text-4xl font-black ${result?.isCorrect ? 'text-success' : 'text-danger'}`}
+            className={`text-4xl font-black ${
+              q.type === 'POLL' ? '' : result?.isCorrect ? 'text-success' : 'text-danger'
+            }`}
           >
-            {result ? (result.isCorrect ? 'Correct!' : 'Incorrect') : "Time's up"}
+            {q.type === 'POLL'
+              ? 'Vote recorded'
+              : result
+                ? result.isCorrect
+                  ? 'Correct!'
+                  : 'Incorrect'
+                : "Time's up"}
           </h1>
-          {result && result.points > 0 && (
+          {q.type !== 'POLL' && result && result.points > 0 && (
             <p className="text-3xl font-black text-cyan">+{result.points}</p>
           )}
           <div className="flex w-full flex-col gap-2">
@@ -183,10 +206,16 @@ export function QuizPreviewPage() {
                 <div
                   key={o.id}
                   className={`flex items-center gap-2 rounded-xl px-4 py-2 text-left font-semibold ${
-                    o.isCorrect ? 'bg-success/20 ring-2 ring-success' : 'bg-white/5'
-                  } ${picked && !o.isCorrect ? 'ring-2 ring-danger' : ''}`}
+                    q.type === 'POLL'
+                      ? picked
+                        ? 'bg-cyan/20 ring-2 ring-cyan'
+                        : 'bg-white/5'
+                      : `${o.isCorrect ? 'bg-success/20 ring-2 ring-success' : 'bg-white/5'} ${picked && !o.isCorrect ? 'ring-2 ring-danger' : ''}`
+                  }`}
                 >
-                  <span>{o.isCorrect ? '✓' : picked ? '✗' : '·'}</span>
+                  <span>
+                    {q.type === 'POLL' ? (picked ? '●' : '·') : o.isCorrect ? '✓' : picked ? '✗' : '·'}
+                  </span>
                   <span className="min-w-0 flex-1">{o.text}</span>
                 </div>
               );

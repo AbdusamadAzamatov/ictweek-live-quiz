@@ -99,6 +99,80 @@ export async function createPlayableQuiz(
   return quizId;
 }
 
+/** CONTENT, SINGLE(4 opts, 5 s), POLL(3 opts, 5 s), SINGLE(4 opts, 5 s), CONTENT. */
+export async function createSlideQuiz(
+  app: FastifyInstance,
+  sid: string,
+): Promise<string> {
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/quizzes',
+    headers: { ...ORIGIN, cookie: `sid=${sid}` },
+  });
+  const quizId = created.json().quiz.id as string;
+  const res = await app.inject({
+    method: 'PUT',
+    url: `/api/quizzes/${quizId}`,
+    headers: { ...ORIGIN, cookie: `sid=${sid}` },
+    payload: {
+      title: 'Slide quiz',
+      description: '',
+      questions: [
+        {
+          type: 'CONTENT',
+          text: 'Welcome to the quiz',
+          explanation: 'An intro slide shown before the first question.',
+          options: [],
+        },
+        {
+          type: 'SINGLE',
+          text: 'Q1 pick one',
+          timeLimitSec: 5,
+          pointsMode: 'STANDARD',
+          explanation: '',
+          options: [
+            { text: 'right', isCorrect: true },
+            { text: 'w1', isCorrect: false },
+            { text: 'w2', isCorrect: false },
+            { text: 'w3', isCorrect: false },
+          ],
+        },
+        {
+          type: 'POLL',
+          text: 'Which option wins?',
+          timeLimitSec: 5,
+          options: [
+            { text: 'p0', isCorrect: false },
+            { text: 'p1', isCorrect: false },
+            { text: 'p2', isCorrect: false },
+          ],
+        },
+        {
+          type: 'SINGLE',
+          text: 'Q2 pick one',
+          timeLimitSec: 5,
+          pointsMode: 'STANDARD',
+          explanation: '',
+          options: [
+            { text: 'right2', isCorrect: true },
+            { text: 'x1', isCorrect: false },
+            { text: 'x2', isCorrect: false },
+            { text: 'x3', isCorrect: false },
+          ],
+        },
+        {
+          type: 'CONTENT',
+          text: 'Closing slide',
+          explanation: 'Thanks!',
+          options: [],
+        },
+      ],
+    },
+  });
+  if (res.statusCode !== 200) throw new Error(`slide quiz put failed: ${res.body}`);
+  return quizId;
+}
+
 export async function createSession(
   app: FastifyInstance,
   sid: string,

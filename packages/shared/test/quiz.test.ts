@@ -106,10 +106,63 @@ describe('validateQuizForPlay', () => {
     expect(validateQuizForPlay(q).some((i) => i.path === 'questions.0.timeLimitSec')).toBe(true);
   });
 
-  it('POLL → unsupported issue', () => {
+  it('POLL: valid poll passes; no correct-count rule; timeLimit still checked', () => {
     const q = validQuiz();
-    q.questions[0]!.type = 'POLL';
-    expect(validateQuizForPlay(q).some((i) => i.message.includes('not supported'))).toBe(true);
+    q.questions[0] = {
+      type: 'POLL',
+      text: 'Which session was your favourite?',
+      timeLimitSec: 20,
+      pointsMode: 'STANDARD',
+      explanation: '',
+      options: [opt('a'), opt('b'), opt('c')],
+    };
+    expect(validateQuizForPlay(q)).toEqual([]);
+
+    q.questions[0]!.options = [opt('only')];
+    expect(validateQuizForPlay(q).some((i) => i.path === 'questions.0.options')).toBe(true);
+
+    q.questions[0]!.options = [opt('a'), opt('b')];
+    q.questions[0]!.timeLimitSec = 7;
+    expect(validateQuizForPlay(q).some((i) => i.path === 'questions.0.timeLimitSec')).toBe(true);
+  });
+
+  it('CONTENT: needs a title, forbids options, ignores timer/points', () => {
+    const q = validQuiz();
+    q.questions[1] = {
+      type: 'CONTENT',
+      text: 'Welcome',
+      timeLimitSec: 7,
+      pointsMode: 'DOUBLE',
+      explanation: 'Intro slide body',
+      options: [],
+    };
+    expect(validateQuizForPlay(q)).toEqual([]);
+
+    q.questions[1]!.options = [opt('x')];
+    expect(
+      validateQuizForPlay(q).some((i) => i.message === 'Content slides have no options'),
+    ).toBe(true);
+
+    q.questions[1]!.options = [];
+    q.questions[1]!.text = '';
+    expect(validateQuizForPlay(q).some((i) => i.path === 'questions.1.text')).toBe(true);
+  });
+
+  it('a quiz of only CONTENT slides is not playable', () => {
+    const q = validQuiz();
+    q.questions = q.questions.map(() => ({
+      type: 'CONTENT',
+      text: 'Slide',
+      timeLimitSec: 20,
+      pointsMode: 'STANDARD',
+      explanation: '',
+      options: [],
+    }));
+    expect(
+      validateQuizForPlay(q).some(
+        (i) => i.message === 'Quiz needs at least one question or poll',
+      ),
+    ).toBe(true);
   });
 });
 

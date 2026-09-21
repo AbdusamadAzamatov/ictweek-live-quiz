@@ -10,6 +10,8 @@ import {
 import { useLive, useServerNow } from '../../live/store';
 import { connectLive, disconnectLive, emitAck } from '../../live/socket';
 import { answerStyle } from '../../lib/answers';
+import { copyText } from '../../lib/clipboard';
+import { randomId } from '../../lib/ids';
 import { useSounds } from '../../lib/sound';
 import { Button } from '../../components/Button';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -23,7 +25,7 @@ function useCommand(): (type: HostCommandType, participantId?: string) => Promis
   return useCallback(async (type, participantId) => {
     try {
       return await emitAck<HostCommandResult>(EV.HostCommand, {
-        commandId: crypto.randomUUID(),
+        commandId: randomId(),
         type,
         payload: participantId ? { participantId } : undefined,
       });
@@ -123,7 +125,9 @@ export function HostPage() {
   const primary = useCallback(() => {
     const state = snapshot?.state;
     if (state === 'LOBBY') return void command('START');
-    if (state === 'ANSWER_REVEAL' || state === 'LEADERBOARD') return void command('NEXT');
+    if (state === 'ANSWER_REVEAL' || state === 'LEADERBOARD' || state === 'CONTENT_SLIDE') {
+      return void command('NEXT');
+    }
     if (state === 'RECOVERY') return void command('REPLAY_QUESTION');
   }, [snapshot?.state, command]);
 
@@ -215,10 +219,20 @@ export function HostPage() {
       </Button>,
     );
   }
-  if (snap.state === 'ANSWER_REVEAL' || snap.state === 'LEADERBOARD') {
+  if (
+    snap.state === 'ANSWER_REVEAL' ||
+    snap.state === 'LEADERBOARD' ||
+    snap.state === 'CONTENT_SLIDE'
+  ) {
     controls.push(
       <Button key="next" onClick={() => void command('NEXT')}>
-        {snap.state === 'ANSWER_REVEAL' && isLastQuestion ? 'Show podium' : 'Next'}
+        {isLastQuestion
+          ? 'Show podium'
+          : snap.state === 'CONTENT_SLIDE'
+            ? 'Next'
+            : q?.type === 'POLL'
+              ? 'Next question'
+              : 'Next'}
       </Button>,
     );
   }
@@ -258,7 +272,7 @@ export function HostPage() {
             State <span className="font-bold text-white">{snap.state}</span> · rev{' '}
             {snap.revision}
             {snap.questionIndex !== null &&
-              ` · Q${snap.questionIndex + 1}/${snap.quiz.questionCount}`}
+              ` · ${snap.state === 'CONTENT_SLIDE' ? 'Slide' : 'Q'}${snap.questionIndex + 1}/${snap.quiz.questionCount}`}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -287,6 +301,13 @@ export function HostPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           <Panel className="flex flex-col items-center gap-4 text-center">
+            {(snap.state === 'LOBBY' || running) && snap.quiz.cover && (
+              <img
+                src={snap.quiz.cover.url}
+                alt={snap.quiz.cover.alt}
+                className="max-h-24 rounded-xl object-contain"
+              />
+            )}
             {(snap.state === 'LOBBY' || running) && (
               <div className="flex items-center gap-6">
                 <div className="min-w-0 flex-1">
@@ -300,7 +321,8 @@ export function HostPage() {
                   <button
                     className="mt-1 text-sm text-cyan underline"
                     onClick={() => {
-                      void navigator.clipboard?.writeText(snap.joinUrl).then(() => {
+                      void copyText(snap.joinUrl).then((ok) => {
+                        if (!ok) return;
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       });
@@ -308,7 +330,29 @@ export function HostPage() {
                   >
                     {copied ? 'Copied!' : 'Copy join link'}
                   </button>
+                  <p className="mt-1 break-all text-xs text-white/40">{snap.joinUrl}</p>
                 </div>
+              </div>
+            )}
+            {snap.state === 'CONTENT_SLIDE' && q && (
+              <div className="w-full text-left">
+                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-white/50">
+                  Slide {q.index + 1}/{snap.quiz.questionCount}
+                </p>
+                <h2 className="text-2xl font-black">{q.text}</h2>
+                {q.media && (
+                  <img
+                    src={q.media.url}
+                    alt={q.media.alt}
+                    className="mt-3 max-h-40 rounded-xl object-contain"
+                  />
+                )}
+                {q.explanation && (
+                  <p className="mt-3 whitespace-pre-wrap text-white/80">{q.explanation}</p>
+                )}
+                <p className="mt-3 text-sm text-white/50">
+                  Content slide — advance when the room is ready.
+                </p>
               </div>
             )}
             {(snap.state === 'COUNTDOWN' || snap.state === 'RECOVERY') && (

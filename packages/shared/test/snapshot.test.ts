@@ -91,4 +91,71 @@ describe('buildQuizSnapshot', () => {
     expect(shuffled.questions.map((q) => q.id)).toEqual(['q2', 'q3', 'q1']);
     expect([...shuffled.questions.map((q) => q.id)].sort()).toEqual(['q1', 'q2', 'q3']);
   });
+
+  it('CONTENT slides keep their position when questions are shuffled', () => {
+    const slide = (id: string, order: number) => ({
+      id,
+      order,
+      type: 'CONTENT',
+      text: `slide ${id}`,
+      timeLimitSec: 20,
+      pointsMode: 'STANDARD' as const,
+      explanation: 'body',
+      options: [],
+    });
+    const q5: SnapshotQuizInput = {
+      ...quiz,
+      questions: [
+        slide('s0', 0),
+        { ...quiz.questions[0]!, id: 'q1', order: 1 },
+        { ...quiz.questions[1]!, id: 'q2', order: 2 },
+        { ...quiz.questions[0]!, id: 'q3', order: 3 },
+        slide('s4', 4),
+      ],
+    };
+    // rng() = 0 is a strong permutation; slides must not move anyway.
+    const s = buildQuizSnapshot(q5, settings({ randomizeQuestions: true }), () => 0);
+    expect(s.questions.map((q) => q.id)).toEqual(['s0', 'q2', 'q3', 'q1', 's4']);
+    expect(s.questions.map((q) => q.index)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('POLL loses isCorrect + pointsMode; CONTENT keeps only text/body/media', () => {
+    const q4: SnapshotQuizInput = {
+      ...quiz,
+      questions: [
+        {
+          id: 'p1',
+          order: 0,
+          type: 'POLL',
+          text: 'vote',
+          timeLimitSec: 20,
+          pointsMode: 'DOUBLE',
+          options: [
+            { id: 'o1', order: 0, text: 'a', isCorrect: true },
+            { id: 'o2', order: 1, text: 'b', isCorrect: false },
+          ],
+        },
+        {
+          id: 'c1',
+          order: 1,
+          type: 'CONTENT',
+          text: 'slide',
+          timeLimitSec: 20,
+          pointsMode: 'STANDARD',
+          explanation: 'the body',
+          options: [{ id: 'x', order: 0, text: 'stray', isCorrect: true }],
+        },
+      ],
+    };
+    const s = buildQuizSnapshot(q4, settings());
+    const poll = s.questions[0]!;
+    expect(poll.type).toBe('POLL');
+    expect(poll.pointsMode).toBe('NONE');
+    expect(poll.options.every((o) => !o.isCorrect)).toBe(true);
+    const slide = s.questions[1]!;
+    expect(slide.type).toBe('CONTENT');
+    expect(slide.pointsMode).toBe('NONE');
+    expect(slide.options).toEqual([]);
+    expect(slide.explanation).toBe('the body');
+  });
 });

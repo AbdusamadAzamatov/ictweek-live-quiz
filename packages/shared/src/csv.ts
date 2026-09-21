@@ -101,15 +101,19 @@ export const CSV_TEMPLATE = `${CSV_HEADER}
 single,"What is 2 + 2?",4,3,5,22,,,1,20,standard,"Basic arithmetic"
 truefalse,"The sky is green",,,,,,,2,10,none,
 multi,"Select the primary colours",Red,Green,Blue,Yellow,,,1;3,30,double,"Pick every correct answer"
+poll,"Which topic should we cover next?",Databases,Networking,Security,AI,,,,20,,
+content,"Break time",,,,,,,,,,"Back in 15 minutes — stretch your legs"
 `;
 
 export type CsvRowError = { row: number; message: string };
 export type CsvImportResult = { questions: QuestionDraft[]; errors: CsvRowError[] };
 
-const TYPE_MAP: Record<string, 'SINGLE' | 'TRUE_FALSE' | 'MULTI'> = {
+const TYPE_MAP: Record<string, 'SINGLE' | 'TRUE_FALSE' | 'MULTI' | 'POLL' | 'CONTENT'> = {
   single: 'SINGLE',
   truefalse: 'TRUE_FALSE',
   multi: 'MULTI',
+  poll: 'POLL',
+  content: 'CONTENT',
 };
 const POINTS_MAP: Record<string, PointsMode> = {
   none: 'NONE',
@@ -151,7 +155,7 @@ export function csvToQuestionDrafts(input: string): CsvImportResult {
 
     const type = TYPE_MAP[rawType.toLowerCase()];
     if (!type) {
-      fail(`unknown type "${rawType}" (expected single|truefalse|multi)`);
+      fail(`unknown type "${rawType}" (expected single|truefalse|multi|poll|content)`);
       return;
     }
     if (question.length === 0) {
@@ -189,6 +193,49 @@ export function csvToQuestionDrafts(input: string): CsvImportResult {
       .map((s) => s.trim())
       .filter((s) => s !== '')
       .map(Number);
+
+    if (type === 'CONTENT') {
+      // A slide: `question` is the title, `explanation` is the body.
+      if (optionTexts.length > 0 || rawCorrect !== '') {
+        fail('content rows have no options and no correct column');
+        return;
+      }
+      questions.push({
+        type,
+        text: question,
+        mediaId: null,
+        timeLimitSec,
+        pointsMode: 'NONE',
+        explanation,
+        options: [],
+      });
+      return;
+    }
+
+    if (type === 'POLL') {
+      if (rawCorrect !== '') {
+        fail('Polls have no correct answer');
+        return;
+      }
+      if (optionTexts.length < 2 || optionTexts.length > 6) {
+        fail('poll needs 2–6 options');
+        return;
+      }
+      if (optionTexts.some((t) => t.length > 75)) {
+        fail('option text must be at most 75 characters');
+        return;
+      }
+      questions.push({
+        type,
+        text: question,
+        mediaId: null,
+        timeLimitSec,
+        pointsMode: 'NONE',
+        explanation,
+        options: optionTexts.map((text) => ({ text, mediaId: null, isCorrect: false })),
+      });
+      return;
+    }
 
     if (type === 'TRUE_FALSE') {
       const idx = correctIndexes[0];

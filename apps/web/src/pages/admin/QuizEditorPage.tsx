@@ -9,6 +9,7 @@ import {
 } from '@ictquiz/shared';
 import { api } from '../../lib/api';
 import { answerStyle } from '../../lib/answers';
+import { randomId } from '../../lib/ids';
 import { Button } from '../../components/Button';
 import { Panel } from '../../components/Panel';
 import { MediaField } from '../../components/MediaField';
@@ -65,7 +66,7 @@ type QuizDto = {
   }>;
 };
 
-const newKey = () => crypto.randomUUID();
+const newKey = () => randomId();
 
 function toDraft(quiz: QuizDto): EditorDraft {
   return {
@@ -127,7 +128,12 @@ function newQuestion(type: QuestionType): EditorQuestion {
       { key: newKey(), text: 'True', mediaId: null, isCorrect: true },
       { key: newKey(), text: 'False', mediaId: null, isCorrect: false },
     ];
-  } else {
+  } else if (type === 'POLL') {
+    base.options = [
+      { key: newKey(), text: '', mediaId: null, isCorrect: false },
+      { key: newKey(), text: '', mediaId: null, isCorrect: false },
+    ];
+  } else if (type !== 'CONTENT') {
     base.options = [
       { key: newKey(), text: '', mediaId: null, isCorrect: false },
       { key: newKey(), text: '', mediaId: null, isCorrect: false },
@@ -140,6 +146,8 @@ const TYPE_LABEL: Record<string, string> = {
   SINGLE: 'Single choice',
   TRUE_FALSE: 'True / False',
   MULTI: 'Multi-select',
+  POLL: 'Poll',
+  CONTENT: 'Content slide',
 };
 
 const inputCls =
@@ -395,7 +403,7 @@ export function QuizEditorPage() {
               <div className="flex items-center gap-2">
                 <span className="text-white/40">{i + 1}.</span>
                 <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold">
-                  {q.type === 'TRUE_FALSE' ? 'T/F' : q.type}
+                  {q.type === 'TRUE_FALSE' ? 'T/F' : q.type === 'CONTENT' ? 'SLIDE' : q.type}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-semibold">
                   {q.text || <em className="text-white/40">(empty)</em>}
@@ -444,7 +452,7 @@ export function QuizEditorPage() {
             </button>
           ))}
           <div className="flex flex-col gap-1">
-            {(['SINGLE', 'TRUE_FALSE', 'MULTI'] as const).map((t) => (
+            {(['SINGLE', 'TRUE_FALSE', 'MULTI', 'POLL', 'CONTENT'] as const).map((t) => (
               <button
                 key={t}
                 className="rounded-xl border border-dashed border-white/20 px-3 py-2 text-left text-sm text-white/70 hover:border-cyan hover:text-white"
@@ -460,8 +468,49 @@ export function QuizEditorPage() {
         <Panel className="min-h-96">
           {!sel ? (
             <p className="text-white/50">Add a question to start editing.</p>
+          ) : sel.type === 'CONTENT' ? (
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className={labelCls}>
+                  Slide title ({sel.text.length}/120)
+                </label>
+                <input
+                  className={inputCls}
+                  value={sel.text}
+                  maxLength={120}
+                  placeholder="Slide title…"
+                  onChange={(e) => patchQ(sel.key, { text: e.target.value })}
+                />
+              </div>
+              <MediaField
+                value={{ mediaId: sel.mediaId, url: sel.mediaUrl, alt: sel.mediaAlt }}
+                onChange={(v) =>
+                  patchQ(sel.key, { mediaId: v.mediaId, mediaUrl: v.url, mediaAlt: v.alt })
+                }
+              />
+              <div>
+                <label className={labelCls}>
+                  Body ({sel.explanation.length}/500)
+                </label>
+                <textarea
+                  className={`${inputCls} min-h-32`}
+                  value={sel.explanation}
+                  maxLength={500}
+                  placeholder="Text shown under the title on the projector…"
+                  onChange={(e) => patchQ(sel.key, { explanation: e.target.value })}
+                />
+              </div>
+              <p className="text-sm text-white/50">
+                Content slides have no answers — the host advances them manually.
+              </p>
+            </div>
           ) : (
             <div className="flex flex-col gap-4">
+              {sel.type === 'POLL' && (
+                <p className="self-start rounded-full bg-cyan/20 px-3 py-1 text-xs font-bold text-cyan">
+                  Unscored poll — no correct answer, no points, no leaderboard
+                </p>
+              )}
               <div>
                 <label className={labelCls}>
                   Question text ({sel.text.length}/120)
@@ -521,17 +570,19 @@ export function QuizEditorPage() {
                           }
                         />
                       )}
-                      <button
-                        title={o.isCorrect ? 'Correct' : 'Mark correct'}
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-black ${
-                          o.isCorrect
-                            ? 'border-success bg-success text-navy'
-                            : 'border-white/30 text-white/50 hover:border-success'
-                        }`}
-                        onClick={() => setCorrect(sel.key, o.key)}
-                      >
-                        {sel.type === 'MULTI' ? (o.isCorrect ? '✓' : '') : o.isCorrect ? '●' : '○'}
-                      </button>
+                      {sel.type !== 'POLL' && (
+                        <button
+                          title={o.isCorrect ? 'Correct' : 'Mark correct'}
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-black ${
+                            o.isCorrect
+                              ? 'border-success bg-success text-navy'
+                              : 'border-white/30 text-white/50 hover:border-success'
+                          }`}
+                          onClick={() => setCorrect(sel.key, o.key)}
+                        >
+                          {sel.type === 'MULTI' ? (o.isCorrect ? '✓' : '') : o.isCorrect ? '●' : '○'}
+                        </button>
+                      )}
                       {!tf && sel.options.length > 2 && (
                         <button
                           className="shrink-0 text-white/40 hover:text-danger"
@@ -582,7 +633,7 @@ export function QuizEditorPage() {
 
         {/* Right: settings + issues */}
         <Panel className="flex flex-col gap-4">
-          {sel && (
+          {sel && sel.type !== 'CONTENT' && (
             <>
               <div>
                 <label className={labelCls}>Time limit</label>
@@ -598,18 +649,20 @@ export function QuizEditorPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className={labelCls}>Points</label>
-                <select
-                  className={inputCls}
-                  value={sel.pointsMode}
-                  onChange={(e) => patchQ(sel.key, { pointsMode: e.target.value })}
-                >
-                  <option value="STANDARD">Standard</option>
-                  <option value="DOUBLE">Double</option>
-                  <option value="NONE">None</option>
-                </select>
-              </div>
+              {sel.type !== 'POLL' && (
+                <div>
+                  <label className={labelCls}>Points</label>
+                  <select
+                    className={inputCls}
+                    value={sel.pointsMode}
+                    onChange={(e) => patchQ(sel.key, { pointsMode: e.target.value })}
+                  >
+                    <option value="STANDARD">Standard</option>
+                    <option value="DOUBLE">Double</option>
+                    <option value="NONE">None</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className={labelCls}>
                   Explanation ({sel.explanation.length}/500)

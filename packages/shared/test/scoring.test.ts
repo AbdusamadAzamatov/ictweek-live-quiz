@@ -113,3 +113,19 @@ describe('scoreSubmission MULTI (2 correct of 4, STANDARD)', () => {
       points: 967,
     }));
 });
+
+describe('scoreSubmission POLL', () => {
+  const poll: ScoreableQuestion = {
+    type: 'POLL',
+    pointsMode: 'STANDARD',
+    timeLimitSec: 20,
+    options: [
+      { id: 'a', isCorrect: false },
+      { id: 'b', isCorrect: false },
+    ],
+  };
+  it('a vote is recorded but never scores', () => {
+    expect(scoreSubmission(poll, ['a'], 100)).toEqual({ isCorrect: false, points: 0 });
+    expect(scoreSubmission(poll, ['b'], 4000)).toEqual({ isCorrect: false, points: 0 });
+  });
+});

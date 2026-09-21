@@ -26,6 +26,7 @@ enum PointsMode {
 enum SessionState {
   LOBBY
   COUNTDOWN
+  CONTENT_SLIDE
   QUESTION_OPEN
   QUESTION_CLOSED
   ANSWER_REVEAL

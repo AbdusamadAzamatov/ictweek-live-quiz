@@ -163,9 +163,54 @@ describe('csvToQuestionDrafts', () => {
     expect(r2.errors[0]!.message).toContain('1 (True) or 2 (False)');
   });
 
-  it('the template imports cleanly with 3 questions', () => {
+  it('parses a poll row (no correct column)', () => {
+    const { questions, errors } = csvToQuestionDrafts(
+      `${header}\npoll,Best talk?,A,B,C,,,,,20,,`,
+    );
+    expect(errors).toEqual([]);
+    expect(questions[0]).toMatchObject({ type: 'POLL', pointsMode: 'NONE' });
+    expect(questions[0]!.options.map((o) => o.isCorrect)).toEqual([false, false, false]);
+  });
+
+  it('rejects a poll row with a correct answer set', () => {
+    const { questions, errors } = csvToQuestionDrafts(
+      `${header}\npoll,Best talk?,A,B,,,,,1,20,,`,
+    );
+    expect(questions).toHaveLength(0);
+    expect(errors[0]!.message).toBe('Polls have no correct answer');
+  });
+
+  it('parses a content row (title + body, no options)', () => {
+    const { questions, errors } = csvToQuestionDrafts(
+      `${header}\ncontent,Welcome,,,,,,,,,,"Intro body text"`,
+    );
+    expect(errors).toEqual([]);
+    expect(questions[0]).toMatchObject({
+      type: 'CONTENT',
+      text: 'Welcome',
+      explanation: 'Intro body text',
+      options: [],
+      pointsMode: 'NONE',
+    });
+  });
+
+  it('rejects a content row with options or a correct column', () => {
+    const r1 = csvToQuestionDrafts(`${header}\ncontent,T,a,,,,,,,,,body`);
+    expect(r1.questions).toHaveLength(0);
+    expect(r1.errors[0]!.message).toContain('content');
+    const r2 = csvToQuestionDrafts(`${header}\ncontent,T,,,,,,,1,,,body`);
+    expect(r2.errors[0]!.message).toContain('content');
+  });
+
+  it('the template imports cleanly with all five row types', () => {
     const { questions, errors } = csvToQuestionDrafts(CSV_TEMPLATE);
     expect(errors).toEqual([]);
-    expect(questions.map((q) => q.type)).toEqual(['SINGLE', 'TRUE_FALSE', 'MULTI']);
+    expect(questions.map((q) => q.type)).toEqual([
+      'SINGLE',
+      'TRUE_FALSE',
+      'MULTI',
+      'POLL',
+      'CONTENT',
+    ]);
   });
 });

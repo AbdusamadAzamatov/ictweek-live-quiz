@@ -1,0 +1,1 @@
+ALTER TYPE "SessionState" ADD VALUE 'CONTENT_SLIDE';

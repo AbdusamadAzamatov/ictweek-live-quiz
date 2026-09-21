@@ -39,6 +39,10 @@ export function scoreSubmission(
   optionIds: string[],
   rtMs: number,
 ): ScoreResult {
+  // Unscored types: a poll vote is recorded but never earns points.
+  if (question.type === 'POLL' || question.type === 'CONTENT') {
+    return { isCorrect: false, points: 0 };
+  }
   const factor = speedFactor(rtMs, question.timeLimitSec * 1000);
 
   if (question.type === 'MULTI') {

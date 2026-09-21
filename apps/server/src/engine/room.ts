@@ -34,6 +34,7 @@ const REVEAL_STATES: ReadonlySet<SessionState> = new Set([
 ]);
 const QUESTION_STATES: ReadonlySet<SessionState> = new Set([
   'COUNTDOWN',
+  'CONTENT_SLIDE',
   'QUESTION_OPEN',
   'QUESTION_CLOSED',
   'ANSWER_REVEAL',
@@ -570,8 +571,9 @@ export class GameRoom {
     if (this.state !== 'LOBBY') return INVALID_STATE;
     const locked = this.locked || !this.settings.allowLateJoin;
     const startedAt = new Date();
+    const slide = this.quizSnapshot.questions[0]?.type === 'CONTENT';
     await this.persist({
-      state: 'COUNTDOWN',
+      state: slide ? 'CONTENT_SLIDE' : 'COUNTDOWN',
       questionIndex: 0,
       set: { locked, startedAt },
       event: 'START',
@@ -579,8 +581,26 @@ export class GameRoom {
     });
     this.locked = locked;
     this.startedAt = startedAt;
-    this.armCountdown();
+    if (slide) this.attempt = null;
+    else this.armCountdown();
     return { ok: true, revision: this.revision };
+  }
+
+  /** Move to `index`: a CONTENT slide shows itself; anything else counts down. */
+  private async advanceTo(index: number): Promise<void> {
+    const q = this.quizSnapshot.questions[index];
+    if (q?.type === 'CONTENT') {
+      this.attempt = null;
+      await this.persist({
+        state: 'CONTENT_SLIDE',
+        questionIndex: index,
+        event: 'CONTENT_SLIDE',
+        eventPayload: { questionIndex: index },
+      });
+      return;
+    }
+    await this.persist({ state: 'COUNTDOWN', questionIndex: index, event: 'NEXT' });
+    this.armCountdown();
   }
 
   private async openQuestion(): Promise<void> {
@@ -636,9 +656,12 @@ export class GameRoom {
     await this.awaitPendingInserts();
     this.clearDeadline();
 
-    // §4 per-question pass over ACTIVE participants.
+    // §4 per-question pass over ACTIVE participants. Polls are unscored:
+    // no score/streak/correctCount writes at all.
+    const isPoll =
+      this.quizSnapshot.questions[attempt.questionIndex]?.type === 'POLL';
     const active = [...this.participants.values()].filter((p) => p.status === 'ACTIVE');
-    const updates = active.map((p) => {
+    const updates = isPoll ? [] : active.map((p) => {
       const sub = attempt.submissions.get(p.id);
       const next = {
         score: p.score,
@@ -701,9 +724,14 @@ export class GameRoom {
   }
 
   private async next(): Promise<HostCommandResult> {
+    const last = (this.questionIndex ?? 0) >= this.quizSnapshot.questions.length - 1;
     if (this.state === 'ANSWER_REVEAL') {
-      const last = (this.questionIndex ?? 0) >= this.quizSnapshot.questions.length - 1;
       if (last) return this.finish();
+      // Polls skip the leaderboard — nothing was scored.
+      if (this.quizSnapshot.questions[this.questionIndex ?? 0]?.type === 'POLL') {
+        await this.advanceTo((this.questionIndex ?? -1) + 1);
+        return { ok: true, revision: this.revision };
+      }
       this.computeLeaderboard();
       await this.persist({ state: 'LEADERBOARD', event: 'LEADERBOARD' });
       return { ok: true, revision: this.revision };
@@ -711,8 +739,12 @@ export class GameRoom {
     if (this.state === 'LEADERBOARD') {
       const nextIndex = (this.questionIndex ?? -1) + 1;
       if (nextIndex >= this.quizSnapshot.questions.length) return INVALID_STATE;
-      await this.persist({ state: 'COUNTDOWN', questionIndex: nextIndex, event: 'NEXT' });
-      this.armCountdown();
+      await this.advanceTo(nextIndex);
+      return { ok: true, revision: this.revision };
+    }
+    if (this.state === 'CONTENT_SLIDE') {
+      if (last) return this.finish();
+      await this.advanceTo((this.questionIndex ?? -1) + 1);
       return { ok: true, revision: this.revision };
     }
     return INVALID_STATE;
@@ -1034,6 +1066,9 @@ export class GameRoom {
       quiz: {
         title: this.quizSnapshot.title,
         questionCount: this.quizSnapshot.questions.length,
+        cover: this.quizSnapshot.coverUrl
+          ? { url: this.quizSnapshot.coverUrl, alt: this.quizSnapshot.coverAlt ?? '' }
+          : null,
       },
       pin: this.pin,
       joinUrl: `${this.deps.publicUrl}/join/${this.pin}`,
@@ -1062,7 +1097,10 @@ export class GameRoom {
             media: o.media,
             ...(showSecrets ? { isCorrect: o.isCorrect } : {}),
           })),
-          ...(showSecrets && q.explanation ? { explanation: q.explanation } : {}),
+          // A CONTENT slide's explanation is the body — always public.
+          ...(q.type === 'CONTENT' || (showSecrets && q.explanation)
+            ? { explanation: q.explanation }
+            : {}),
           ...(this.attempt
             ? {
                 openedAt: new Date(this.attempt.openedAtMs).toISOString(),
@@ -1119,10 +1157,14 @@ export class GameRoom {
           me.submission = { attemptId: attempt!.id, optionIds: sub.optionIds };
         }
         if (closed && reveal) {
-          const r = attempt.submissions.get(participantId);
-          me.lastResult = r
-            ? { correct: r.isCorrect, points: r.points, streak: p.streak }
-            : { correct: false, points: 0, streak: p.streak };
+          // A poll has no correctness to report — the phone just thanks you.
+          const q = this.quizSnapshot.questions[attempt.questionIndex];
+          if (q?.type !== 'POLL') {
+            const r = attempt.submissions.get(participantId);
+            me.lastResult = r
+              ? { correct: r.isCorrect, points: r.points, streak: p.streak }
+              : { correct: false, points: 0, streak: p.streak };
+          }
         }
         snap.me = me;
       }

@@ -17,6 +17,7 @@ type Report = {
     endedAt: string | null;
     participantCount: number;
     questionCount: number;
+    scoredQuestionCount: number;
   };
   standings: Array<{
     rank: number;
@@ -37,8 +38,8 @@ type Report = {
     correctOptionIds: string[];
     eligible: number;
     answered: number;
-    correctCount: number;
-    accuracyPct: number;
+    correctCount: number | null;
+    accuracyPct: number | null;
     avgResponseMs: number;
     distribution: Array<{ optionId: string; count: number }>;
   }>;
@@ -89,6 +90,9 @@ export function SessionReportPage() {
   }
   const r = report.data;
   const s = r.session;
+  const pollIndexes = new Set(
+    r.questions.filter((q) => q.type === 'POLL').map((q) => q.index),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -101,6 +105,7 @@ export function SessionReportPage() {
           <p className="text-white/60">
             PIN <span className="font-mono font-bold">{s.pin}</span> ·{' '}
             {new Date(s.createdAt).toLocaleString()} · {s.participantCount} players ·{' '}
+            {s.questionCount} slides ({s.scoredQuestionCount} scored) ·{' '}
             <span className="font-bold">{s.state}</span>
           </p>
         </div>
@@ -153,7 +158,14 @@ export function SessionReportPage() {
                 </div>
                 <div className="shrink-0 text-right text-sm text-white/70">
                   <p>
-                    <span className="font-black text-success">{q.accuracyPct}%</span> correct
+                    {q.accuracyPct === null ? (
+                      <span className="font-black text-cyan">poll</span>
+                    ) : (
+                      <>
+                        <span className="font-black text-success">{q.accuracyPct}%</span>{' '}
+                        correct
+                      </>
+                    )}
                   </p>
                   <p>
                     {q.answered}/{q.eligible} answered · avg {q.avgResponseMs} ms
@@ -232,7 +244,13 @@ export function SessionReportPage() {
                   <td className={`${td} font-bold`}>{resp.nickname}</td>
                   <td className={`${td} tabular-nums`}>{resp.questionIndex + 1}</td>
                   <td className={td}>{resp.optionLabels.join(', ')}</td>
-                  <td className={td}>{resp.isCorrect ? '✓' : '✗'}</td>
+                  <td className={td}>
+                    {pollIndexes.has(resp.questionIndex)
+                      ? 'n/a'
+                      : resp.isCorrect
+                        ? '✓'
+                        : '✗'}
+                  </td>
                   <td className={`${td} text-right tabular-nums`}>{resp.points}</td>
                   <td className={`${td} text-right tabular-nums`}>{resp.responseTimeMs}</td>
                 </tr>

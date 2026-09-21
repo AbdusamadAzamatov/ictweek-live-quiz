@@ -87,12 +87,23 @@ export function validateQuizForPlay(quiz: QuizForValidation): Issue[] {
   quiz.questions.forEach((q, i) => {
     const base = `questions.${i}`;
 
-    if (q.type === 'POLL' || q.type === 'CONTENT') {
-      at(`${base}.type`, i, `Question type ${q.type} is not supported in this release`);
+    const textLen = q.text.trim().length;
+
+    if (q.type === 'CONTENT') {
+      // A slide: text is the title, explanation is the body. No options,
+      // no timer, no points.
+      if (textLen < 1 || q.text.length > 120) {
+        at(`${base}.text`, i, 'Slide title must be 1–120 characters');
+      }
+      if (q.options.length > 0) {
+        at(`${base}.options`, i, 'Content slides have no options');
+      }
+      if ((q.explanation ?? '').length > 500) {
+        at(`${base}.explanation`, i, 'Slide body must be at most 500 characters');
+      }
       return;
     }
 
-    const textLen = q.text.trim().length;
     if (textLen < 1 || q.text.length > 120) {
       at(`${base}.text`, i, 'Question text must be 1–120 characters (media alone is not enough)');
     }
@@ -117,6 +128,7 @@ export function validateQuizForPlay(quiz: QuizForValidation): Issue[] {
       if (q.type === 'MULTI' && correct < 1) {
         at(`${base}.options`, i, 'MULTI needs at least 1 correct option');
       }
+      // POLL: isCorrect is ignored — every option is just a choice.
     }
 
     q.options.forEach((o, oi) => {
@@ -129,13 +141,20 @@ export function validateQuizForPlay(quiz: QuizForValidation): Issue[] {
     if (!(TIME_LIMITS as readonly number[]).includes(q.timeLimitSec)) {
       at(`${base}.timeLimitSec`, i, `timeLimitSec must be one of ${TIME_LIMITS.join(', ')}`);
     }
-    if (!(POINTS_MODES as readonly string[]).includes(q.pointsMode)) {
+    if (q.type !== 'POLL' && !(POINTS_MODES as readonly string[]).includes(q.pointsMode)) {
       at(`${base}.pointsMode`, i, 'pointsMode must be NONE, STANDARD or DOUBLE');
     }
     if ((q.explanation ?? '').length > 500) {
       at(`${base}.explanation`, i, 'Explanation must be at most 500 characters');
     }
   });
+
+  if (
+    quiz.questions.length > 0 &&
+    quiz.questions.every((q) => q.type === 'CONTENT')
+  ) {
+    at('questions', undefined, 'Quiz needs at least one question or poll');
+  }
 
   return issues;
 }

@@ -10,6 +10,7 @@ import {
   loadStoredPlayer,
 } from '../live/socket';
 import { AnswerCard } from '../components/AnswerCard';
+import { randomId } from '../lib/ids';
 import { Button } from '../components/Button';
 import { Panel } from '../components/Panel';
 
@@ -79,7 +80,7 @@ export function PlayPage() {
     try {
       const res = await emitAck<PlayerAnswerResult>(EV.PlayerAnswer, {
         attemptId,
-        submissionId: crypto.randomUUID(),
+        submissionId: randomId(),
         optionIds,
       });
       if (res.status === 'accepted' || res.status === 'duplicate') {
@@ -148,14 +149,31 @@ export function PlayPage() {
           </>
         );
         break;
+      case 'CONTENT_SLIDE':
+        body = (
+          <>
+            <h1 className="mb-2 text-3xl font-black">Look at the screen</h1>
+            {question && <p className="text-2xl font-bold text-cyan">{question.text}</p>}
+            {showText && question?.explanation && (
+              <p className="mt-2 whitespace-pre-wrap text-white/70">{question.explanation}</p>
+            )}
+          </>
+        );
+        break;
       case 'QUESTION_OPEN':
         if (submitted) {
           const chosenIds = me?.submission?.optionIds ?? submittedFor?.optionIds ?? [];
           const chosen = question?.options.filter((o) => chosenIds.includes(o.id)) ?? [];
           body = (
             <div className="flex w-full flex-col items-center gap-4">
-              <h1 className="mb-2 text-3xl font-black">Answer sent</h1>
-              <p className="text-white/70">Waiting for the other players…</p>
+              <h1 className="mb-2 text-3xl font-black">
+                {question?.type === 'POLL' ? 'Vote sent' : 'Answer sent'}
+              </h1>
+              <p className="text-white/70">
+                {question?.type === 'POLL'
+                  ? 'Thanks for voting!'
+                  : 'Waiting for the other players…'}
+              </p>
               {chosen.length > 0 && (
                 <div
                   className={`grid w-full gap-3 ${chosen.length <= 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}
@@ -240,6 +258,31 @@ export function PlayPage() {
         break;
       case 'ANSWER_REVEAL': {
         const r = me?.lastResult;
+        if (question?.type === 'POLL') {
+          const chosenIds = me?.submission?.optionIds ?? submittedFor?.optionIds ?? [];
+          const chosen = question.options.filter((o) => chosenIds.includes(o.id));
+          body = (
+            <div className="flex w-full flex-col items-center gap-4">
+              <h1 className="mb-2 text-3xl font-black">Thanks for voting!</h1>
+              {chosen.length > 0 && (
+                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+                  {chosen.map((o) => (
+                    <AnswerCard
+                      key={o.id}
+                      index={o.index}
+                      label={o.text}
+                      media={o.media}
+                      showText={showText}
+                      selected
+                      disabled
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+          break;
+        }
         body = (
           <>
             <h1

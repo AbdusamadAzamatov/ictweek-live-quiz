@@ -91,11 +91,22 @@ export async function quizRoutes(app: FastifyInstance) {
       orderBy: { updatedAt: 'desc' },
       include: { _count: { select: { questions: true } } },
     });
+    const coverIds = quizzes.map((q) => q.coverMediaId).filter((x): x is string => !!x);
+    const covers = coverIds.length
+      ? await app.prisma.mediaAsset.findMany({
+          where: { id: { in: coverIds }, organizerId: req.organizerId },
+        })
+      : [];
+    const coverBy = new Map(
+      covers.map((a) => [a.id, { url: `/media/${a.storagePath}`, alt: a.altText }]),
+    );
     return {
       quizzes: quizzes.map((q) => ({
         id: q.id,
         title: q.title,
         description: q.description,
+        coverMediaId: q.coverMediaId,
+        cover: q.coverMediaId ? (coverBy.get(q.coverMediaId) ?? null) : null,
         questionCount: q._count.questions,
         createdAt: q.createdAt,
         updatedAt: q.updatedAt,

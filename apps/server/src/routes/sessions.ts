@@ -91,6 +91,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const resolvedQuiz = {
       ...quiz,
       coverUrl: quiz.coverMediaId ? (mediaBy.get(quiz.coverMediaId)?.url ?? null) : null,
+      coverAlt: quiz.coverMediaId ? (mediaBy.get(quiz.coverMediaId)?.alt ?? null) : null,
       questions: quiz.questions.map((q) => ({
         ...q,
         media: q.mediaId ? (mediaBy.get(q.mediaId) ?? null) : null,

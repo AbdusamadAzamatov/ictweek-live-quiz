@@ -2,8 +2,13 @@
   "format": "ictquiz-v1",
   "quiz": {
     "title": "ICTWEEK — ICT Basics",
-    "description": "Sample 8-question quiz on ICT topics. Import via POST /api/quizzes/import or the library's Import JSON button.",
+    "description": "Sample quiz on ICT topics: intro slide, 8 questions, and an unscored poll. Import via POST /api/quizzes/import or the library's Import JSON button.",
     "questions": [
+      {
+        "type": "CONTENT",
+        "text": "Welcome to ICTWEEK!",
+        "explanation": "Get your phones ready — join with the PIN on screen. The first question is coming up next."
+      },
       {
         "type": "SINGLE",
         "text": "What does \"HTTP\" stand for?",
@@ -52,6 +57,18 @@
           { "text": "443", "isCorrect": true },
           { "text": "22", "isCorrect": false },
           { "text": "8080", "isCorrect": false }
+        ]
+      },
+      {
+        "type": "POLL",
+        "text": "Which topic should we dive into during the workshop?",
+        "timeLimitSec": 20,
+        "explanation": "",
+        "options": [
+          { "text": "Networking", "isCorrect": false },
+          { "text": "Cybersecurity", "isCorrect": false },
+          { "text": "Programming", "isCorrect": false },
+          { "text": "Databases", "isCorrect": false }
         ]
       },
       {

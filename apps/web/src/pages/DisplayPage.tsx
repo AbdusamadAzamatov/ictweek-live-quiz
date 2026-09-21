@@ -46,6 +46,13 @@ function Lobby({ snap, lobby }: { snap: GameSnapshot; lobby: { count: number; pa
 
   return (
     <div className="flex w-full flex-col items-center gap-8">
+      {snap.quiz.cover && (
+        <img
+          src={snap.quiz.cover.url}
+          alt={snap.quiz.cover.alt}
+          className="max-h-32 rounded-xl object-contain"
+        />
+      )}
       <h1 className="text-4xl font-black">{snap.quiz.title}</h1>
       <div className="flex items-center gap-10">
         <div className="text-center">
@@ -101,7 +108,14 @@ function QuestionOpen({
   return (
     <div className="flex w-full flex-col items-center gap-6">
       <div className="flex w-full max-w-6xl items-start justify-between gap-6">
-        <h1 className="flex-1 text-4xl font-black">{q.text}</h1>
+        <h1 className="flex-1 text-4xl font-black">
+          {q.type === 'POLL' && (
+            <span className="mr-3 inline-block rounded-full bg-cyan/20 px-3 py-1 align-middle text-base font-bold text-cyan">
+              Poll
+            </span>
+          )}
+          {q.text}
+        </h1>
         <TimerRing fraction={fraction} seconds={seconds} size={110} danger={seconds <= 5} />
       </div>
       {q.media && (
@@ -146,8 +160,30 @@ function QuestionOpen({
   );
 }
 
+function ContentSlide({ snap }: { snap: GameSnapshot }) {
+  const q = snap.question!;
+  return (
+    <div className="flex w-full max-w-5xl flex-col items-center gap-6 text-center">
+      <h1 className="text-6xl font-black">{q.text}</h1>
+      {q.media && (
+        <img
+          src={q.media.url}
+          alt={q.media.alt}
+          className="max-h-[45vh] max-w-full rounded-panel object-contain"
+        />
+      )}
+      {q.explanation && (
+        <p className="max-w-4xl whitespace-pre-wrap text-2xl text-white/80">
+          {q.explanation}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AnswerReveal({ snap }: { snap: GameSnapshot }) {
   const q = snap.question!;
+  const isPoll = q.type === 'POLL';
   const results = snap.results;
   const max = Math.max(1, ...(results?.distribution.map((d) => d.count) ?? [1]));
   const correctIds = new Set(results?.correctOptionIds ?? []);
@@ -167,7 +203,7 @@ function AnswerReveal({ snap }: { snap: GameSnapshot }) {
                 style={{
                   backgroundColor: st.color,
                   color: st.darkText ? '#001C5D' : '#fff',
-                  opacity: correct ? 1 : 0.45,
+                  opacity: isPoll || correct ? 1 : 0.45,
                 }}
               >
                 <span className="text-2xl">{st.shape}</span>
@@ -194,6 +230,7 @@ function AnswerReveal({ snap }: { snap: GameSnapshot }) {
         })}
       </div>
       {q.explanation && <p className="text-xl text-white/70">{q.explanation}</p>}
+      {isPoll && <p className="text-2xl font-bold text-white/80">Thanks for voting</p>}
     </div>
   );
 }
@@ -307,6 +344,13 @@ export function DisplayPage() {
             </div>
             <p className="text-3xl font-black text-white/80">Get ready…</p>
           </div>
+        );
+        break;
+      case 'CONTENT_SLIDE':
+        body = snapshot.question ? (
+          <ContentSlide snap={snapshot} />
+        ) : (
+          <p className="text-2xl text-white/60">…</p>
         );
         break;
       case 'QUESTION_OPEN':

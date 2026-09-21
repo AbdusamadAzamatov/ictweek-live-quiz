@@ -9,6 +9,8 @@ type QuizListItem = {
   id: string;
   title: string;
   description: string;
+  coverMediaId: string | null;
+  cover: { url: string; alt: string } | null;
   questionCount: number;
   updatedAt: string;
 };
@@ -116,6 +118,13 @@ export function LibraryPage() {
         <div className="grid gap-3">
           {quizzes.data?.quizzes.map((q) => (
             <Panel key={q.id} className="flex flex-wrap items-center gap-3">
+              {q.cover && (
+                <img
+                  src={q.cover.url}
+                  alt={q.cover.alt}
+                  className="h-14 w-20 shrink-0 rounded-lg object-cover"
+                />
+              )}
               <div className="min-w-0 flex-1">
                 <button
                   className="block truncate text-xl font-bold hover:text-cyan"

@@ -1,6 +1,6 @@
 export const QUESTION_TYPES = ['SINGLE', 'TRUE_FALSE', 'MULTI', 'POLL', 'CONTENT'] as const;
 export type QuestionType = (typeof QUESTION_TYPES)[number];
-export type PlayableQuestionType = 'SINGLE' | 'TRUE_FALSE' | 'MULTI';
+export type PlayableQuestionType = 'SINGLE' | 'TRUE_FALSE' | 'MULTI' | 'POLL' | 'CONTENT';
 
 export const POINTS_MODES = ['NONE', 'STANDARD', 'DOUBLE'] as const;
 export type PointsMode = (typeof POINTS_MODES)[number];
@@ -8,6 +8,7 @@ export type PointsMode = (typeof POINTS_MODES)[number];
 export const SESSION_STATES = [
   'LOBBY',
   'COUNTDOWN',
+  'CONTENT_SLIDE',
   'QUESTION_OPEN',
   'QUESTION_CLOSED',
   'ANSWER_REVEAL',
@@ -45,6 +46,7 @@ export type QuizSnapshot = {
   title: string;
   description: string;
   coverUrl: string | null;
+  coverAlt: string | null;
   questions: SnapshotQuestion[];
 };
 
@@ -63,7 +65,7 @@ export type GameSnapshot = {
   state: SessionState;
   /** Date.now() at emit time; clients derive a clock offset for timers. */
   serverTime: number;
-  quiz: { title: string; questionCount: number };
+  quiz: { title: string; questionCount: number; cover: MediaRef | null };
   pin: string;
   joinUrl: string;
   locked: boolean;
