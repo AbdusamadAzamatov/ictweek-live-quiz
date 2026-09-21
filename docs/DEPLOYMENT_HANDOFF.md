@@ -114,6 +114,15 @@ docker/verify-backup.sh docker/backups/<ts>          # restores into a throwaway
 | Memory limit | `docker stats --no-stream ictquiz-app-1` | RSS well under the 2 GiB limit (dev measurement: 120–180 MB at 500 players) |
 | Logs | `… logs -f app` | no repeated errors |
 
+**Pre-deploy gate for anyone changing code:** `pnpm lint && pnpm typecheck && pnpm test &&
+pnpm build && pnpm e2e` must all pass on the reviewed commit before it is tagged for deploy.
+
+**Configured limits** (defaults; override in `docker/.env` only if a venue needs it):
+`JOIN_FAIL_PER_MIN=120`, `JOIN_FAIL_PER_HOUR=1000`, `JOIN_SUCCESS_PER_MIN=1200` — shared per
+client IP across `GET /api/join/:pin` and socket `player:join`, reconnect-resistant; plus a
+per-socket bucket of 5 joins/min. Venue NAT is safe: successes barely count, only failures burn
+the small budget.
+
 If the app container ever hits the 2 GiB limit it is OOM-killed and restarted by Docker; any question
 in progress goes to **RECOVERY** and the host chooses *Replay question*.
 

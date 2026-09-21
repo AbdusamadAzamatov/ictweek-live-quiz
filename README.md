@@ -56,6 +56,7 @@ pnpm lint         # eslint across the workspace
 pnpm typecheck    # tsc --noEmit per package
 pnpm test         # vitest per package (server tests need the dev Postgres)
 pnpm build        # shared → server (prisma generate + tsc) → web (vite)
+pnpm e2e          # Playwright: 10-check release suite against the production build (:3100)
 
 # 50-player live-game load test (dev server or deployed stack):
 pnpm --filter @ictquiz/server load-test -- --players 50 --questions 3 \

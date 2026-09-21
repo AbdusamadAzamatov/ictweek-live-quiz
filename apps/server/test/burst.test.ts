@@ -118,17 +118,26 @@ describe('micro-batched submissions', () => {
     const att = open.question!.attemptId;
     const opt = open.question!.options[0]!.id;
 
-    // 100 answers + CLOSE_ANSWERS in the same tick — the close must wait for
-    // the batch to commit before scoring.
+    // 100 answers + CLOSE_ANSWERS in the same tick over 101 different sockets:
+    // arrival order across sockets is not guaranteed, so an answer that reaches
+    // the server after the close is legitimately rejected as CLOSED. The
+    // invariant under test: every ACCEPTED ack is a committed row that the
+    // close counted and scored — the close must drain the pending batch first.
     const answers = players.map((p, i) => answer(p, att, `close-${i}`, [opt]));
     const closeAck = cmd(host, 'c2', 'CLOSE_ANSWERS');
     const acks = await Promise.all(answers);
-    expect(acks.every((a) => a.status === 'accepted')).toBe(true);
+    for (const a of acks) {
+      expect(a.status === 'accepted' || (a.status === 'rejected' && a.reason === 'CLOSED')).toBe(
+        true,
+      );
+    }
+    const accepted = acks.filter((a) => a.status === 'accepted').length;
+    expect(accepted).toBeGreaterThan(0);
     expect((await closeAck).ok).toBe(true);
 
     const reveal = await waitForState(host.snaps, 'ANSWER_REVEAL');
-    expect(reveal.results!.answered).toBe(100);
-    expect(await prisma.submission.count({ where: { attemptId: att } })).toBe(100);
+    expect(reveal.results!.answered).toBe(accepted);
+    expect(await prisma.submission.count({ where: { attemptId: att } })).toBe(accepted);
 
     // Every answer scored exactly once: score == sum(committed points).
     const parts = await prisma.participant.findMany({

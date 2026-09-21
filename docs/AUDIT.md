@@ -1,6 +1,7 @@
 # Audit — implementation vs. `docs/plan/README.md` and `docs/plan/BUILD_PROMPT.md`
 
-Audited on 2026-09-21 at commit `781bf59`; the fixes in section A landed in `53a3923` and `3b464a0`.
+Audited on 2026-09-21 at commit `781bf59`; the fixes in section A landed in `53a3923`, `3b464a0`
+and the final corrections round (`d4f52c2`).
 Every Release A requirement in the two plan documents was compared with the code, the tests and the
 runbooks. Items are classified as **A** fixed in this round, **B** accepted differences for the event
 build (documented, not fixed), **C** cannot be verified from the development machine.
@@ -18,6 +19,17 @@ build (documented, not fixed), **C** cannot be verified from the development mac
 | A7 | Deployment runbook accuracy (README §9) | Docker install steps were incomplete (no apt repository); the 2 GB app memory limit was described as "informational" although `docker compose` enforces it (`docker inspect` → `HostConfig.Memory = 2147483648`); no HSTS header | Runbook rewritten with the official install steps and sizing; Caddy adds `Strict-Transport-Security` |
 | A8 | Capacity must be measured on the real server (README "Confirmed facts"; BUILD_PROMPT "Do not claim this capacity until measured") | Only development-machine numbers existed and the report did not separate them from server numbers | `docs/runbooks/server-load-test.md` with exact commands; `docs/TEST_REPORT.md` split into "development machine (measured)" and "target server (pending)" |
 | A9 | Phone testing instructions | Earlier guidance said to join from a phone against `localhost`, which is unreachable from another device | Replaced by the LAN rehearsal runbook (`DOMAIN=http://<LAN-IP>`, `PUBLIC_URL=http://<LAN-IP>`, firewall note) |
+
+**Resolved in the final corrections round** (no longer open differences):
+
+- **B11** — join-rate / PIN-enumeration protection was hardened: a shared per-IP `JoinLimiter`
+  now covers both `GET /api/join/:pin` and socket `player:join` (failures 120/min and 1000/h,
+  successes 1200/min, sliding windows; the per-socket 5/min bucket is kept; the check runs before
+  the PIN lookup so a limited IP learns nothing). Reconnecting no longer resets the budget;
+  `ratelimit.test.ts` proves a 300-player mass join from one venue IP still works.
+- **B12** — a real Playwright suite now exists (`apps/e2e`, 10 serial checks against the
+  production build, `pnpm e2e`). What remains untested is physical Android/iOS hardware —
+  tracked under section C.
 
 ## B. Behavioural differences that remain (accepted for the event build)
 
@@ -40,8 +52,6 @@ slides at your request) and the system-font fallback.
 | B8 | Lobby music (reference product loops music in the lobby) | Short synthesized cues only | Silent lobby apart from cues | Mine (no licensed audio available) | Keep; if you own a licensed track, it can be dropped in later |
 | B9 | Removed participant's nickname | Stays reserved for that session | The removed person cannot rejoin under the same name; nobody else can use it either | Mine | Keep |
 | B10 | Leaderboard movement arrows after an app restart | First leaderboard after a restart shows no ▲/▼ | Cosmetic, only after a crash/restart | Mine | Keep |
-| B11 | Join-rate / PIN-enumeration protection (README §7) | HTTP PIN lookup 600/min/IP; socket join 5/min per socket; no per-IP socket limit | A determined attacker on the internet could probe PINs faster than the reference product allows; venue users unaffected | Mine (venue NAT trade-off) | Keep for the event; if the server is public for long periods, add a per-IP socket cap in Release B |
-| B12 | Browser end-to-end tests (README §9) | Socket-level integration tests + headless-Chrome screenshot scripts; no Playwright suite | No effect on players; regressions in pure UI wiring would be caught by screenshots, not assertions | Disclosed | Keep for the event; add Playwright if development continues |
 | B13 | Poll variants | Single-select polls only | Audience cannot pick several poll options | Mine | Keep unless your quiz needs multi-select polls |
 | B14 | Nickname moderation (reference has a profanity filter) | None; host removes offenders | Offensive names appear on the projector until removed | Mine | Keep; brief the host on the × button and the lobby lock |
 | B15 | `QUESTION_CLOSED` state | Transient; persisted state goes `QUESTION_OPEN → ANSWER_REVEAL` in one transaction | None | Disclosed | Keep |

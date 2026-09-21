@@ -21,8 +21,8 @@ Remaining behavioural differences are numbered **B1–B18**, matching
 | 4 | Question/answer images, safe upload, alt text | `POST/PATCH /api/media` (magic-byte check via file-type, image-size dims), `MediaField` in editor | `media-csv.test.ts::accepts a png`, `::rejects wrong magic bytes`, `::rejects oversize`, `::scopes PATCH` | Local disk storage only; no remote URL fetching |
 | 5 | CSV import w/ preview + template; JSON import/export | `GET /api/import-template.csv`, `POST /quizzes/:id/import-csv[/preview]`, `POST /quizzes/import`, per-quiz export | `media-csv.test.ts::serves the template`, `::previews valid rows`, `::imports only valid rows`; `csv.test.ts` (25 — incl. poll/content rows) | `format: "ictquiz-v1"` for JSON |
 | 6 | Session creation w/ immutable quiz/settings snapshot | `POST /api/sessions` → `quizSnapshot` JSON incl. resolved media URLs and cover | `sessions.test.ts::POST /sessions on a valid quiz`; `media-csv::freezes media urls` | — |
-| 7 | Unique active PIN, QR, join link, nickname, no account | `activePin` on session; `/join/:pin`; `qrcode` on display+host | `sessions.test.ts::GET /api/join/:pin is public`; `live.test.ts` joins | — |
-| 8 | Lobby, count, removal, lock, late-join, player limit | `GameRoom.join/removeParticipant/setLocked`; `maxParticipants`, `allowLateJoin` settings | `live.test.ts::locks the lobby, removes participants and kills their tokens`, `::marks late joiners ineligible` | Removed participant's **nickname stays taken** for that session — **B9** |
+| 7 | Unique active PIN, QR, join link, nickname, no account | `activePin` on session; `/join/:pin`; `qrcode` on display+host | `sessions.test.ts::GET /api/join/:pin is public`; `live.test.ts` joins; `ratelimit.test.ts` (join budget) | — |
+| 8 | Lobby, count, removal, lock, late-join, player limit | `GameRoom.join/removeParticipant/setLocked`; `maxParticipants`, `allowLateJoin` settings | `live.test.ts::locks the lobby, removes participants and kills their tokens`, `::marks late joiners ineligible`; `ratelimit.test.ts::300-player mass join` | Removed participant's **nickname stays taken** for that session — **B9** |
 | 9 | Host control UI + read-only projector view | `/admin/host/:id`; `/display/:displayKey` | `live.test.ts` host/display socket flows; phase screenshots | — |
 | 10 | Countdown, timer, submit+ack, reveal, distribution, explanation, leaderboard, podium | `GameRoom` state machine; `TimerRing`; reveal/leaderboard/podium views | `live.test.ts::runs a full 2-question game`; `oracle.test.ts` recomputes every row independently | Countdown is **fixed 5 s**; **no auto-advance** after reveal — **B7** |
 | 11 | Standard/no/double points, speed scoring, deterministic ties, streak display | `shared/scoring.ts`, `shared/ranking.ts` | `scoring.test.ts` (21), `ranking.test.ts` (7), `oracle.test.ts` (inline formula + inline ranking) | See scoring rows — **no streak bonus** (**B4**), deterministic ties (**B5**) |
@@ -72,8 +72,8 @@ Remaining behavioural differences are numbered **B1–B18**, matching
 | Leaderboard top 5 / podium top 3 | `buildSnapshot` | `live.test.ts::runs a full game` | — |
 | Event logo optional, disabled by default | `VITE_EVENT_LOGO_URL` build-time var | — | **B2** — enabling needs a rebuild (runtime config deferred) |
 | Lobby music | short synthesized cues only | — | **B8** — no bundled audio assets (licensing); cues cover transitions |
-| Join-rate / PIN-enumeration protection | HTTP PIN lookup 600/min/IP; socket join 5/min per socket | `live.test.ts` rate-limit test | **B11** — no per-IP socket limit (venue NAT); residual risk documented |
-| Browser end-to-end journeys | Socket.IO integration tests + headless-Chrome screenshot scripts | all of the above + `artifacts/*-screens/` | **B12** — no Playwright suite (stretch goal) |
+| Join-rate / PIN-enumeration protection | Shared per-IP `JoinLimiter` across HTTP + socket: failures 120/min (`JOIN_FAIL_PER_MIN`) + 1000/h (`JOIN_FAIL_PER_HOUR`), successes 1200/min (`JOIN_SUCCESS_PER_MIN`); per-socket bucket 5/min kept; check runs before PIN lookup so a limited IP learns nothing | `ratelimit.test.ts` (5 — reconnect enumeration, shared channel budget, 300-player mass join, window expiry) | **Hardened** (Round C) — venue-NAT mass join verified; residual: a distributed attacker across many IPs |
+| Browser end-to-end journeys | Playwright suite (`apps/e2e`, 10 checks) against the production build + socket-level integration tests + headless-Chrome screenshot scripts | `pnpm e2e`; `artifacts/*-screens/` | **B12 resolved** — physical Android/iOS checks still pending (§5 / venue checklist) |
 | Nickname moderation | host removal only | `live.test.ts` remove flow | **B14** — no profanity filter |
 | Release B/C features (typed answers, ordering, slider, word cloud, team play, accuracy mode, assignments, question bank, translations) | — | — | **B17** — explicitly out of Release A scope |
 | Host disconnect handling | current question finishes on server timer; nothing auto-advances | `live.test.ts` | **B18** — matches README §5 recovery rules |
@@ -92,8 +92,8 @@ Remaining behavioural differences are numbered **B1–B18**, matching
 | B8 | Synthesized cues only, no lobby music | Engine & scoring rows |
 | B9 | Removed participant's nickname stays reserved | Item 8 |
 | B10 | Leaderboard deltas reset to 0 after restart | Item 14 + engine rows |
-| B11 | No per-IP socket join limit | Engine & scoring rows |
-| B12 | No Playwright suite | Engine & scoring rows |
+| B11 | ~~No per-IP socket join limit~~ — resolved: shared per-IP `JoinLimiter` (Round C) | Engine & scoring rows |
+| B12 | ~~No Playwright suite~~ — resolved: `apps/e2e`, 10 checks (Round D) | Engine & scoring rows |
 | B13 | Polls are single-select | Item 3 + engine rows |
 | B14 | No profanity filter | Engine & scoring rows |
 | B15 | `QUESTION_CLOSED` is transient | Engine & scoring rows |

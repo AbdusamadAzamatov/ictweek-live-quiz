@@ -1,0 +1,16 @@
+{
+  "name": "@ictquiz/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.0.0",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.0"
+  }
+}

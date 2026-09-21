@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "e2e": "pnpm build && pnpm --filter @ictquiz/e2e test",
     "db:up": "docker compose -f docker/compose.dev.yml up -d",
     "db:migrate": "pnpm --filter @ictquiz/server db:migrate"
   },
