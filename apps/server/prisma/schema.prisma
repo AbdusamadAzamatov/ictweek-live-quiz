@@ -1,0 +1,205 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum QuestionType {
+  SINGLE
+  TRUE_FALSE
+  MULTI
+  POLL
+  CONTENT
+}
+
+enum PointsMode {
+  NONE
+  STANDARD
+  DOUBLE
+}
+
+enum SessionState {
+  LOBBY
+  COUNTDOWN
+  QUESTION_OPEN
+  QUESTION_CLOSED
+  ANSWER_REVEAL
+  LEADERBOARD
+  FINISHED
+  CANCELLED
+  RECOVERY
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum AttemptStatus {
+  OPEN
+  CLOSED
+  VOIDED
+}
+
+model Organizer {
+  id           String             @id @default(uuid())
+  email        String             @unique
+  passwordHash String
+  createdAt    DateTime           @default(now())
+  sessions     OrganizerSession[]
+  quizzes      Quiz[]
+  media        MediaAsset[]
+  gameSessions GameSession[]
+}
+
+model OrganizerSession {
+  id          String    @id // sha256(token) hex
+  organizerId String
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  organizer   Organizer @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+}
+
+model Quiz {
+  id           String        @id @default(uuid())
+  organizerId  String
+  title        String
+  description  String        @default("")
+  coverMediaId String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  organizer    Organizer     @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  questions    Question[]
+  gameSessions GameSession[]
+}
+
+model Question {
+  id          String         @id @default(uuid())
+  quizId      String
+  order       Int
+  type        QuestionType
+  text        String         @default("")
+  mediaId     String?
+  timeLimitSec Int           @default(20)
+  pointsMode  PointsMode     @default(STANDARD)
+  explanation String         @default("")
+  quiz        Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options     AnswerOption[]
+
+  @@unique([quizId, order])
+}
+
+model AnswerOption {
+  id         String   @id @default(uuid())
+  questionId String
+  order      Int
+  text       String   @default("")
+  mediaId    String?
+  isCorrect  Boolean  @default(false)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, order])
+}
+
+model MediaAsset {
+  id           String    @id @default(uuid())
+  organizerId  String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  width        Int
+  height       Int
+  storagePath  String
+  altText      String    @default("")
+  createdAt    DateTime  @default(now())
+  organizer    Organizer @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+}
+
+model GameSession {
+  id            String      @id @default(uuid())
+  organizerId   String
+  quizId        String? // nullable: quiz may be deleted later, snapshot remains
+  pin           String // 6 digits, kept for history
+  activePin     String?     @unique // == pin while state not in (FINISHED, CANCELLED); null afterwards
+  displayKey    String      @unique // random 16 bytes base64url, projector access
+  quizSnapshot  Json // QuizSnapshot (frozen content incl. isCorrect, shuffled per settings)
+  settings      Json // SessionSettings
+  state         SessionState @default(LOBBY)
+  revision      Int          @default(0)
+  questionIndex Int? // current question index in snapshot
+  locked        Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  startedAt     DateTime?
+  endedAt       DateTime?
+  organizer     Organizer    @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  quiz          Quiz?        @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  participants  Participant[]
+  attempts      QuestionAttempt[]
+  events        SessionEvent[]
+}
+
+model Participant {
+  id              String            @id @default(uuid())
+  sessionId       String
+  nickname        String
+  nicknameKey     String // lowercased trimmed
+  resumeTokenHash String            @unique // sha256 of the resume token
+  status          ParticipantStatus @default(ACTIVE)
+  score           Int               @default(0)
+  streak          Int               @default(0)
+  correctCount    Int               @default(0)
+  totalResponseMs Int               @default(0)
+  joinedAt        DateTime          @default(now())
+  lastSeenAt      DateTime          @default(now())
+  session         GameSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  submissions     Submission[]
+
+  @@unique([sessionId, nicknameKey])
+}
+
+model QuestionAttempt {
+  id            String        @id @default(uuid())
+  sessionId     String
+  questionIndex Int
+  attemptNo     Int // increments on replay
+  openedAt      DateTime
+  deadlineAt    DateTime
+  closedAt      DateTime?
+  status        AttemptStatus @default(OPEN)
+  session       GameSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  submissions   Submission[]
+
+  @@unique([sessionId, questionIndex, attemptNo])
+}
+
+model Submission {
+  id             String          @id @default(uuid())
+  attemptId      String
+  participantId  String
+  submissionId   String // client idempotency key (uuid)
+  optionIds      String[]
+  receivedAt     DateTime
+  responseTimeMs Int
+  isCorrect      Boolean
+  points         Int
+  attempt        QuestionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  participant    Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, participantId]) // one final answer per participant per attempt
+}
+
+model SessionEvent {
+  id        BigInt      @id @default(autoincrement())
+  sessionId String
+  type      String
+  payload   Json
+  createdAt DateTime    @default(now())
+  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, id])
+}

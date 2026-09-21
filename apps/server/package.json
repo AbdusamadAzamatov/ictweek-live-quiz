@@ -1,0 +1,38 @@
+{
+  "name": "@ictquiz/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --import tsx --conditions=development src/index.ts",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "create-organizer": "tsx --conditions=development scripts/create-organizer.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/multipart": "10.1.1",
+    "@fastify/rate-limit": "11.2.0",
+    "@fastify/static": "10.1.3",
+    "@ictquiz/shared": "workspace:*",
+    "@node-rs/argon2": "2.2.1",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "dotenv": "17.4.2",
+    "fastify": "5.12.4",
+    "pg": "8.23.0",
+    "zod": "4.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.0.0",
+    "@types/pg": "8.15.0",
+    "prisma": "7.10.0",
+    "tsx": "4.23.13",
+    "typescript": "6.0.3",
+    "vitest": "5.0.0"
+  }
+}

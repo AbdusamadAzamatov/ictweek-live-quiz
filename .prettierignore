@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+generated
+pnpm-lock.yaml
+media
+media-test
+docs/plan

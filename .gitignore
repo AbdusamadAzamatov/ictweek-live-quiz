@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+media/
+media-test/
+coverage/
+apps/server/src/generated/
+*.log

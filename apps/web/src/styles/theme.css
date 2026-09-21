@@ -1,0 +1,61 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-navy: #001c5d;
+  --color-royal: #0028ac;
+  --color-azure: #0084ff;
+  --color-cyan: #00d8ff;
+  --color-ink: #ffffff;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+
+  /* Answer option identity: colour is never the only cue (shape + letter too). */
+  --color-option-a: #0084ff;
+  --color-option-b: #7c3aed;
+  --color-option-c: #00d8ff;
+  --color-option-d: #f59e0b;
+  --color-option-e: #ec4899;
+  --color-option-f: #10b981;
+
+  --gradient-brand: linear-gradient(90deg, #0028ac 0%, #0084ff 55%, #00d8ff 100%);
+  --radius-panel: 1.25rem;
+  /* TT Travels Next can be dropped in later; falls back to system stack. */
+  --font-display:
+    'TT Travels Next', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+}
+
+@utility bg-brand {
+  background-image: var(--gradient-brand);
+}
+
+html {
+  font-family: var(--font-display);
+}
+
+body {
+  background-color: var(--color-navy);
+  color: var(--color-ink);
+  min-height: 100vh;
+}
+
+/* Navy background with restrained corner glow */
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(60rem 40rem at -10% -10%, rgb(0 132 255 / 0.18), transparent 60%),
+    radial-gradient(55rem 38rem at 110% 110%, rgb(0 216 255 / 0.12), transparent 60%),
+    var(--color-navy);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
