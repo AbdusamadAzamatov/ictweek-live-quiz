@@ -91,7 +91,9 @@ export function PlayPage() {
             ? "Time's up"
             : res.reason === 'NOT_ELIGIBLE'
               ? "You'll join at the next question"
-              : 'Answer was not accepted',
+              : res.reason === 'TEMPORARY'
+                ? 'Could not save your answer — tap again'
+                : 'Answer was not accepted',
         );
       }
     } catch {

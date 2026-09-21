@@ -9,14 +9,19 @@ import type {
 } from '@ictquiz/shared';
 import { buildApp } from '../src/app.js';
 import { ORIGIN } from './helpers.js';
+import type { PrismaClient } from '../src/generated/prisma/client.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export type LiveApp = { app: FastifyInstance; url: string };
 
-export async function liveApp(opts?: { countdownMs?: number }): Promise<LiveApp> {
+export async function liveApp(opts?: {
+  countdownMs?: number;
+  prisma?: PrismaClient;
+}): Promise<LiveApp> {
   const app = await buildApp({
     logger: false,
+    prisma: opts?.prisma,
     config: { countdownMs: opts?.countdownMs ?? 200 },
   });
   await app.listen({ port: 0, host: '127.0.0.1' });

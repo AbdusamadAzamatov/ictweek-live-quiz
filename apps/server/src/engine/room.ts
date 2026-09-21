@@ -67,6 +67,15 @@ type RoomSubmission = {
   responseTimeMs: number;
   isCorrect: boolean;
   points: number;
+  /** Set while the row waits in the micro-batch; resolves after commit. */
+  pending?: Promise<PlayerAnswerResult>;
+};
+
+type PendingInsert = {
+  attempt: RoomAttempt;
+  participantId: string;
+  row: RoomSubmission;
+  resolve: (r: PlayerAnswerResult) => void;
 };
 
 type RoomAttempt = {
@@ -138,6 +147,9 @@ export class GameRoom {
   private commandAcks = new Map<string, HostCommandResult>();
 
   private queueTail: Promise<unknown> = Promise.resolve();
+  private pendingInserts: PendingInsert[] = [];
+  private flushScheduled = false;
+  private flushChain: Promise<void> = Promise.resolve();
   private countdownTimer: NodeJS.Timeout | null = null;
   private deadlineTimer: NodeJS.Timeout | null = null;
   private lobbyTimer: NodeJS.Timeout | null = null;
@@ -340,110 +352,169 @@ export class GameRoom {
     req: PlayerAnswerRequest,
     receivedAt: Date,
   ): Promise<PlayerAnswerResult> {
-    return this.run(async () => {
-      const p = this.participants.get(participantId);
-      if (!p || p.status !== 'ACTIVE') {
-        return { status: 'rejected', reason: 'UNAUTHORIZED' } as const;
-      }
-      const attempt = this.attempt;
-      // Idempotent retry wins over state/deadline checks (§5): a client that
-      // retries after the attempt closed must get its original ack back.
-      if (attempt && attempt.id === req.attemptId) {
-        const prior = attempt.submissions.get(participantId);
-        if (prior) {
-          if (prior.submissionId === req.submissionId) {
-            return {
-              status: 'accepted',
-              submissionId: prior.submissionId,
-              receivedAt: prior.receivedAt.toISOString(),
-            } as const;
-          }
-          return { status: 'duplicate', submissionId: prior.submissionId } as const;
-        }
-      }
-      if (
-        this.state !== 'QUESTION_OPEN' ||
-        !attempt ||
-        attempt.status !== 'OPEN' ||
-        attempt.id !== req.attemptId
-      ) {
-        const closed =
-          attempt != null && attempt.id === req.attemptId && attempt.status !== 'OPEN';
-        return {
-          status: 'rejected',
-          reason: closed ? 'CLOSED' : 'STALE_ATTEMPT',
-        } as const;
-      }
-      if (receivedAt.getTime() > attempt.deadlineAtMs) {
-        return { status: 'rejected', reason: 'LATE' } as const;
-      }
-      if (p.joinedAt.getTime() >= attempt.openedAtMs) {
-        return { status: 'rejected', reason: 'NOT_ELIGIBLE' } as const;
-      }
+    // The queued task only makes decisions and reserves the row — it returns
+    // immediately so the queue keeps draining. The ack resolves when the
+    // micro-batch commits (or is rejected as TEMPORARY on failure).
+    return this.run(() => this.decideSubmission(participantId, req, receivedAt)).then(
+      (d) => ('pendingAck' in d ? d.pendingAck : d),
+    );
+  }
 
-      const question = this.quizSnapshot.questions[attempt.questionIndex];
-      if (!question) return { status: 'rejected', reason: 'STALE_ATTEMPT' } as const;
-      const known = new Set(question.options.map((o) => o.id));
-      const ids = [...new Set(req.optionIds)];
-      const valid =
-        question.type === 'MULTI'
-          ? ids.length >= 1 && ids.every((id) => known.has(id))
-          : req.optionIds.length === 1 && ids.length === 1 && known.has(ids[0]!);
-      if (!valid) return { status: 'rejected', reason: 'INVALID' } as const;
-
-      const rt = Math.max(0, receivedAt.getTime() - attempt.openedAtMs);
-      const { isCorrect, points } = scoreSubmission(question, ids, rt);
-
-      try {
-        await this.deps.prisma.submission.create({
-          data: {
-            attemptId: attempt.id,
-            participantId,
-            submissionId: req.submissionId,
-            optionIds: ids,
-            receivedAt,
-            responseTimeMs: rt,
-            isCorrect,
-            points,
-          },
-        });
-        attempt.submissions.set(participantId, {
-          submissionId: req.submissionId,
-          optionIds: ids,
-          receivedAt,
-          responseTimeMs: rt,
-          isCorrect,
-          points,
-        });
-      } catch (e) {
-        if (!isUniqueViolation(e)) throw e;
-        const existing = await this.deps.prisma.submission.findUniqueOrThrow({
-          where: { attemptId_participantId: { attemptId: attempt.id, participantId } },
-        });
-        if (existing.submissionId === req.submissionId) {
+  private decideSubmission(
+    participantId: string,
+    req: PlayerAnswerRequest,
+    receivedAt: Date,
+  ): PlayerAnswerResult | { pendingAck: Promise<PlayerAnswerResult> } {
+    const p = this.participants.get(participantId);
+    if (!p || p.status !== 'ACTIVE') {
+      return { status: 'rejected', reason: 'UNAUTHORIZED' };
+    }
+    const attempt = this.attempt;
+    // Idempotent retry wins over state/deadline checks (§5): a client that
+    // retries after the attempt closed must get its original ack back — and a
+    // retry that lands while the first insert is still pending gets the same
+    // pending promise, so both resolve with the identical committed ack.
+    if (attempt && attempt.id === req.attemptId) {
+      const prior = attempt.submissions.get(participantId);
+      if (prior) {
+        if (prior.submissionId === req.submissionId) {
           return {
-            status: 'accepted',
-            submissionId: existing.submissionId,
-            receivedAt: existing.receivedAt.toISOString(),
-          } as const;
+            pendingAck:
+              prior.pending ??
+              Promise.resolve({
+                status: 'accepted',
+                submissionId: prior.submissionId,
+                receivedAt: prior.receivedAt.toISOString(),
+              }),
+          };
         }
-        return { status: 'duplicate', submissionId: existing.submissionId } as const;
+        return { status: 'duplicate', submissionId: prior.submissionId };
       }
-
-      this.deps.io
-        .to(`p:${participantId}`)
-        .emit(EV.PlayerSubmission, { attemptId: attempt.id, optionIds: ids });
-      this.scheduleProgress();
-
-      if (this.allEligibleAnswered()) {
-        await this.closeQuestion('all-answered');
-      }
+    }
+    if (
+      this.state !== 'QUESTION_OPEN' ||
+      !attempt ||
+      attempt.status !== 'OPEN' ||
+      attempt.id !== req.attemptId
+    ) {
+      const closed =
+        attempt != null && attempt.id === req.attemptId && attempt.status !== 'OPEN';
       return {
-        status: 'accepted',
-        submissionId: req.submissionId,
-        receivedAt: receivedAt.toISOString(),
-      } as const;
+        status: 'rejected',
+        reason: closed ? 'CLOSED' : 'STALE_ATTEMPT',
+      };
+    }
+    if (receivedAt.getTime() > attempt.deadlineAtMs) {
+      return { status: 'rejected', reason: 'LATE' };
+    }
+    if (p.joinedAt.getTime() >= attempt.openedAtMs) {
+      return { status: 'rejected', reason: 'NOT_ELIGIBLE' };
+    }
+
+    const question = this.quizSnapshot.questions[attempt.questionIndex];
+    if (!question) return { status: 'rejected', reason: 'STALE_ATTEMPT' };
+    const known = new Set(question.options.map((o) => o.id));
+    const ids = [...new Set(req.optionIds)];
+    const valid =
+      question.type === 'MULTI'
+        ? ids.length >= 1 && ids.every((id) => known.has(id))
+        : req.optionIds.length === 1 && ids.length === 1 && known.has(ids[0]!);
+    if (!valid) return { status: 'rejected', reason: 'INVALID' };
+
+    const rt = Math.max(0, receivedAt.getTime() - attempt.openedAtMs);
+    const { isCorrect, points } = scoreSubmission(question, ids, rt);
+
+    // Reserve immediately so eligibility/duplicate checks see it, then let the
+    // micro-batch commit it — one createMany per burst instead of one create
+    // per answer.
+    const row: RoomSubmission = {
+      submissionId: req.submissionId,
+      optionIds: ids,
+      receivedAt,
+      responseTimeMs: rt,
+      isCorrect,
+      points,
+    };
+    const pendingAck = new Promise<PlayerAnswerResult>((resolve) => {
+      this.pendingInserts.push({ attempt, participantId, row, resolve });
     });
+    row.pending = pendingAck;
+    attempt.submissions.set(participantId, row);
+    this.scheduleFlush();
+    return { pendingAck };
+  }
+
+  // ------------------------------------------------------------------
+  // Micro-batched submission inserts
+  // ------------------------------------------------------------------
+
+  private scheduleFlush(): void {
+    if (this.flushScheduled) return;
+    this.flushScheduled = true;
+    setImmediate(() => {
+      this.flushScheduled = false;
+      this.chainFlush();
+    });
+  }
+
+  /** Appends a flush to the chain; the chain never stays rejected. */
+  private chainFlush(): Promise<void> {
+    this.flushChain = this.flushChain
+      .then(() => this.flushPending())
+      .catch((e: unknown) => this.deps.recordError(e));
+    return this.flushChain;
+  }
+
+  private async flushPending(): Promise<void> {
+    const batch = this.pendingInserts.splice(0);
+    if (batch.length === 0) return;
+    try {
+      await this.deps.prisma.submission.createMany({
+        data: batch.map((b) => ({
+          attemptId: b.attempt.id,
+          participantId: b.participantId,
+          submissionId: b.row.submissionId,
+          optionIds: b.row.optionIds,
+          receivedAt: b.row.receivedAt,
+          responseTimeMs: b.row.responseTimeMs,
+          isCorrect: b.row.isCorrect,
+          points: b.row.points,
+        })),
+        skipDuplicates: true,
+      });
+    } catch (e) {
+      this.deps.recordError(e);
+      for (const b of batch) {
+        b.attempt.submissions.delete(b.participantId);
+        b.row.pending = undefined;
+        b.resolve({ status: 'rejected', reason: 'TEMPORARY' });
+      }
+      return;
+    }
+    for (const b of batch) {
+      b.row.pending = undefined;
+      b.resolve({
+        status: 'accepted',
+        submissionId: b.row.submissionId,
+        receivedAt: b.row.receivedAt.toISOString(),
+      });
+      this.deps.io
+        .to(`p:${b.participantId}`)
+        .emit(EV.PlayerSubmission, { attemptId: b.attempt.id, optionIds: b.row.optionIds });
+    }
+    this.scheduleProgress();
+    if (this.allEligibleAnswered()) {
+      this.run(() => this.closeQuestion('all-answered')).catch(this.deps.recordError);
+    }
+  }
+
+  /**
+   * Resolves once every reserved submission has been committed (or rolled
+   * back). Called at the top of transitions that read attempt.submissions for
+   * durable decisions (close, void, end).
+   */
+  private awaitPendingInserts(): Promise<void> {
+    return this.chainFlush();
   }
 
   // ------------------------------------------------------------------
@@ -560,6 +631,9 @@ export class GameRoom {
       return trigger === 'host' ? INVALID_STATE : { ok: true, revision: this.revision };
     }
     const attempt = this.attempt;
+    // Commit every reserved submission before scoring — scores must derive
+    // from durable rows only.
+    await this.awaitPendingInserts();
     this.clearDeadline();
 
     // §4 per-question pass over ACTIVE participants.
@@ -661,6 +735,8 @@ export class GameRoom {
     if (this.state === 'FINISHED' || this.state === 'CANCELLED') return INVALID_STATE;
     const final: SessionState = this.startedAt ? 'FINISHED' : 'CANCELLED';
     const attempt = this.attempt;
+    // Commit pending submissions before voiding the open attempt.
+    await this.awaitPendingInserts();
     if (final === 'FINISHED') this.computeLeaderboard();
     await this.persist({
       state: final,
@@ -727,6 +803,8 @@ export class GameRoom {
   private async replayQuestion(): Promise<HostCommandResult> {
     if (this.state !== 'RECOVERY') return INVALID_STATE;
     const attempt = this.attempt;
+    // Commit pending submissions before voiding the interrupted attempt.
+    await this.awaitPendingInserts();
     await this.persist({
       state: 'COUNTDOWN',
       event: 'REPLAY_QUESTION',

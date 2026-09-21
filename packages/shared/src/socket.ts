@@ -112,7 +112,8 @@ export type PlayerAnswerResult =
         | 'LATE'
         | 'NOT_ELIGIBLE'
         | 'INVALID'
-        | 'RATE_LIMITED';
+        | 'RATE_LIMITED'
+        | 'TEMPORARY';
     };
 
 export type StateSyncRequest = Record<string, never>;
