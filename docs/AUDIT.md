@@ -1,6 +1,6 @@
 # Audit — implementation vs. `docs/plan/README.md` and `docs/plan/BUILD_PROMPT.md`
 
-Audited on 2026-09-21 at commit `781bf59`, then re-checked after the fixes listed in section A.
+Audited on 2026-09-21 at commit `781bf59`; the fixes in section A landed in `53a3923` and `3b464a0`.
 Every Release A requirement in the two plan documents was compared with the code, the tests and the
 runbooks. Items are classified as **A** fixed in this round, **B** accepted differences for the event
 build (documented, not fixed), **C** cannot be verified from the development machine.

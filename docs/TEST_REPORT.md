@@ -1,7 +1,9 @@
 # Test report — Release A event build
 
-Sections 1–3 actually ran on 2026-09-21 against commit `ed3f707` plus the
-uncommitted Round A/B changes (or the commit named in the row). Section 2B is
+Sections 1–3 actually ran on 2026-09-21; the automated suites and browser
+passes against the tree committed as `3b464a0`, the load tests against
+`ed3f707` (the live-game hot path is unchanged since; polls/slides/password
+work touched validation, reports, UI and a new state). Section 2B is
 pending the target server; section 5 lists what cannot be done from the
 development machine at all. Anything not listed here was **not** tested.
 
