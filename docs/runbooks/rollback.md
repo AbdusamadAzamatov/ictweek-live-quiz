@@ -42,12 +42,16 @@ changes are usually fine; renames/drops are not).
 
 If a migration itself must be undone:
 
-1. Restore the database backup taken **before** the deploy:
-   `docker/restore.sh docker/backups/<pre-deploy-ts>`
-2. Then roll back the app image as above (matching the backup's schema era).
+1. **Verify the pre-deploy backup before relying on it** (isolated throwaway
+   Postgres — live data untouched):
+   `docker/verify-backup.sh docker/backups/<pre-deploy-ts>` → expect
+   `VERIFY OK`.
+2. Restore it (destructive — stops the app, overwrites the live DB + media):
+   `docker/restore.sh --yes docker/backups/<pre-deploy-ts>`
+3. Then roll back the app image as above (matching the backup's schema era).
 
-Rule of thumb: **always take a backup immediately before `up -d --build`**
-so a schema-level rollback is one `restore.sh` away.
+Rule of thumb: **always take and verify a backup immediately before
+`up -d --build`** so a schema-level rollback is one `restore.sh` away.
 
 ## Verify
 

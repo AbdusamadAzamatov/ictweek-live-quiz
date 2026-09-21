@@ -21,26 +21,33 @@ build (documented, not fixed), **C** cannot be verified from the development mac
 
 ## B. Behavioural differences that remain (accepted for the event build)
 
-| # | Requirement / reference behaviour | Implementation | Why it stays |
-| --- | --- | --- | --- |
-| B1 | "Published versions" / `QuizVersion` records (BUILD_PROMPT item 2; README §6) | The quiz is frozen into an immutable JSON snapshot when a session is created; there is no separate version table or publish step | Delivers the required immutability for reports and play; a publish workflow adds UI without event value |
-| B2 | Event-logo display "optional and disabled by default" (README §3) | `VITE_EVENT_LOGO_URL` is a **build-time** variable; enabling it needs a rebuild | Disabled by default as required; runtime configuration deferred |
-| B3 | Late joiners "by default" start with the next question (README §5) | Fixed rule, not configurable | Matches the default; no alternative policy was requested |
-| B4 | Streak bonus (reference product awards bonus points for answer streaks) | Streak is displayed only; no bonus points | README §5 asks for "streak display separately from any streak bonus"; a bonus formula is not documented by the reference and would be invented |
-| B5 | Tie handling | Deterministic total order `score ↓, correct ↓, total response time ↑, joined ↑, id ↑`; no shared ranks | README §5 requires a documented policy and forbids assuming undocumented reference behaviour |
-| B6 | Multi-select points | 500 per correct option (Standard), 1000 (Double); any wrong selection → 0 | Two reference support articles disagree (500 vs 1000 per correct); "How points work" was followed; single constant `MULTI_POINTS_PER_CORRECT_STANDARD` |
-| B7 | Host flow extras (skip question, hide/show leaderboard, auto-advance timer) | Not implemented; countdown fixed at 5 s; every advance is manual | Not in the Release A list; manual control is the safer event default |
-| B8 | Lobby music | Short synthesized cues only (countdown, open, close, reveal, leaderboard, podium) | No audio assets may be bundled without licensing; cues cover the functional need |
-| B9 | Nickname of a removed participant | Stays reserved for that session | Prevents the removed person from rejoining under the same name |
-| B10 | Leaderboard movement arrows after an application restart | Deltas show 0 for the first leaderboard after a restart | Previous ranks are in-memory only; scores and ranks themselves are correct |
-| B11 | Join-rate / PIN-enumeration protection (README §7) | HTTP PIN lookup 600/min/IP; socket join 5/min **per socket**; no per-IP socket limit | Per-IP socket limits would block a venue NAT; PIN space (10⁶) with few active sessions and short session lifetime keep enumeration impractical; documented residual risk |
-| B12 | Browser end-to-end tests (README §9 "complete journeys") | Integration tests over Socket.IO + headless-Chrome screenshot scripts; no Playwright suite | DESIGN §10 listed Playwright as stretch; journeys are exercised by the socket tests and the screenshot scripts |
-| B13 | Poll variants | Polls are single-select | The reference also offers multi-select polls; not requested |
-| B14 | Nickname moderation | No profanity filter; host removal only | Not required by the plan |
-| B15 | `QUESTION_CLOSED` state | Transient: the persisted state goes `QUESTION_OPEN → ANSWER_REVEAL` in one transaction | Same atomicity guarantee with one fewer write |
-| B16 | Ending a session mid-question | The open question is voided and excluded from reports | Keeps standings and responses consistent |
-| B17 | Release B features named in BUILD_PROMPT (typed answers, ordering, slider, word cloud, team play, accuracy mode, assignments, question bank, translations…) | Not implemented | Explicitly Release B / C |
-| B18 | Real-time host disconnect handling | The current question finishes on the server timer; nothing auto-advances | Matches README §5 recovery rules |
+**Origin** says who made the call. *Plan* = the behaviour is what your plan documents specify;
+*Disclosed* = an implementation decision of mine that was reported to you in an earlier summary but
+never individually approved; *Mine* = an implementation decision first disclosed in this audit.
+None of the eighteen was explicitly approved by you item by item; the only scope decisions you
+approved directly were Release A, the three original question types (later widened to polls and
+slides at your request) and the system-font fallback.
+
+| # | Original requirement / reference behaviour | Implemented behaviour | User-visible impact | Origin | Recommendation |
+| --- | --- | --- | --- | --- | --- |
+| B1 | "Published versions" / `QuizVersion` (BUILD_PROMPT 2; README §6) | Quiz frozen into an immutable snapshot when a session is created; no version table or publish step | None during play; the library has no version history to browse | Mine | Keep for the event; add version history in Release B if authoring continues after the event |
+| B2 | Event logo "optional and disabled by default" (README §3) | `VITE_EVENT_LOGO_URL` is a build-time variable | Logo can only be enabled by rebuilding the image | Mine | Keep (logo is off by default); decide before building the event image whether you want it |
+| B3 | Late joiners "by default" start with the next question (README §5) | Fixed rule, not configurable | A phone that joins mid-question waits for the next one — always | Plan (default) / Mine (not configurable) | Keep |
+| B4 | Streak bonus (reference product awards extra points for streaks) | Streak shown on the phone; no bonus points | Scores are lower than the reference for streaks; ranking unaffected | Plan (README §5: display "separately from any streak bonus") | Keep; document to players that streaks are display-only |
+| B5 | Tie handling | Deterministic order `score ↓, correct ↓, total response time ↑, joined ↑, id ↑`; no shared ranks | Two players with equal points never share a place; the faster one ranks higher | Plan (README §5 requires a documented policy) | Keep; mention the rule when presenting the podium |
+| B6 | Multi-select points | 500 per correct option (1000 doubled); any wrong pick → 0 | A fully correct multi-select with 2 correct options scores the same as a single-choice question (1000); the reference may award 2000 | Mine (chose "How points work" over a conflicting article) | Keep unless you prefer the higher value — a one-constant change (`MULTI_POINTS_PER_CORRECT_STANDARD`) plus re-running the unit tests |
+| B7 | Skip question, hide/show leaderboard, auto-advance timer (reference host tools) | Not implemented; 5 s countdown; every step is a manual Next | Host must press Next after each reveal and leaderboard; cannot skip a question live | Mine | Keep for the event (manual control is safer); consider "skip" post-event |
+| B8 | Lobby music (reference product loops music in the lobby) | Short synthesized cues only | Silent lobby apart from cues | Mine (no licensed audio available) | Keep; if you own a licensed track, it can be dropped in later |
+| B9 | Removed participant's nickname | Stays reserved for that session | The removed person cannot rejoin under the same name; nobody else can use it either | Mine | Keep |
+| B10 | Leaderboard movement arrows after an app restart | First leaderboard after a restart shows no ▲/▼ | Cosmetic, only after a crash/restart | Mine | Keep |
+| B11 | Join-rate / PIN-enumeration protection (README §7) | HTTP PIN lookup 600/min/IP; socket join 5/min per socket; no per-IP socket limit | A determined attacker on the internet could probe PINs faster than the reference product allows; venue users unaffected | Mine (venue NAT trade-off) | Keep for the event; if the server is public for long periods, add a per-IP socket cap in Release B |
+| B12 | Browser end-to-end tests (README §9) | Socket-level integration tests + headless-Chrome screenshot scripts; no Playwright suite | No effect on players; regressions in pure UI wiring would be caught by screenshots, not assertions | Disclosed | Keep for the event; add Playwright if development continues |
+| B13 | Poll variants | Single-select polls only | Audience cannot pick several poll options | Mine | Keep unless your quiz needs multi-select polls |
+| B14 | Nickname moderation (reference has a profanity filter) | None; host removes offenders | Offensive names appear on the projector until removed | Mine | Keep; brief the host on the × button and the lobby lock |
+| B15 | `QUESTION_CLOSED` state | Transient; persisted state goes `QUESTION_OPEN → ANSWER_REVEAL` in one transaction | None | Disclosed | Keep |
+| B16 | Ending a session mid-question | The open question is voided and excluded from reports | If the host ends during a question, that question's answers are discarded | Disclosed | Keep; hosts should end only from a reveal or leaderboard |
+| B17 | Release B features (typed answers, ordering, slider, word cloud, team play, accuracy mode, assignments, question bank, translations…) | Not implemented | Only SINGLE / TRUE_FALSE / MULTI / POLL / CONTENT are available | Plan (BUILD_PROMPT Release B) | Keep |
+| B18 | Host disconnect mid-question | The question finishes on the server timer; nothing auto-advances | Players see the reveal even if the host laptop drops; the game waits for the host to return | Plan (README §5) | Keep |
 
 ## C. Requires your server or physical devices (cannot be done from here)
 

@@ -20,7 +20,10 @@
 - [ ] Host laptop: `/admin/host/<sessionId>` opens, keyboard shortcuts work
       (`Space`/`→`/`N` next, `C` close answers, `L` lock, `F` fullscreen, `M`
       mute, `?` hint overlay).
-- [ ] Backup taken: `docker/backup.sh` (see backup-restore.md).
+- [ ] Backup taken **and verified**: `docker/backup.sh` then
+      `docker/verify-backup.sh docker/backups/<ts>` → `VERIFY OK` (see
+      backup-restore.md; the verify step restores into a throwaway container
+      and cannot touch live data).
 
 ## T-0 — 30 minutes before
 
