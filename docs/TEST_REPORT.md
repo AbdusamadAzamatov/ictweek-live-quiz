@@ -1,10 +1,11 @@
 # Test report — Release A event build
 
-Sections 1–3 actually ran on 2026-09-21; the automated suites, the browser
-suite and the rollback rehearsal ran against the tree committed as
-`d4f52c2`, earlier load tests against `ed3f707` (the live-game hot path is
-unchanged since; polls/slides/password work touched validation, reports,
-UI and a new state). Section 2B is
+**Frozen package: tag `release-a-event`.** Sections 1–3 actually ran on
+2026-09-21: the automated suites, the browser suite (`pnpm e2e`) and the
+final gate against the frozen tree (`a082075`), the rollback rehearsal and
+the limiter load run against `d4f52c2`/`a421692`, and the earlier load tiers
+against `ed3f707` (the live-game hot path is unchanged since, apart from the
+join limiter, which the `tier-500p-limiter` run covers). Section 2B is
 pending the target server; section 5 lists what cannot be done from the
 development machine at all. Anything not listed here was **not** tested.
 

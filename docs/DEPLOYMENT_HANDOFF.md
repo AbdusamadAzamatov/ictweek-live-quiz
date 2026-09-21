@@ -1,7 +1,9 @@
 # Deployment handoff — ICTWEEK Live Quiz (Release A)
 
-Status: **package ready for review — not deployed.** Target-server capacity is **unverified** until
-`docs/TEST_REPORT.md` §2B is filled in from runs on the real server.
+Status: **package frozen at git tag `release-a-event` — not deployed.** Target-server capacity is
+**unverified** until `docs/TEST_REPORT.md` §2B is filled in from runs on the real server. Deploy the
+tagged commit (`git checkout release-a-event`); any later change re-opens the package and must re-run
+`pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm e2e`.
 
 ## 1. What to transfer
 
