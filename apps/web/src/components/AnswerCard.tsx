@@ -7,6 +7,7 @@ import { answerStyle } from '../lib/answers';
 export function AnswerCard({
   index,
   label,
+  media,
   selected = false,
   showText = true,
   disabled = false,
@@ -14,6 +15,7 @@ export function AnswerCard({
 }: {
   index: number;
   label: string;
+  media?: { url: string; alt: string } | null;
   selected?: boolean;
   /** false on player devices when the host keeps text on the big screen. */
   showText?: boolean;
@@ -36,6 +38,13 @@ export function AnswerCard({
         {style.shape}
       </span>
       <span className="font-black">{style.letter}</span>
+      {media && (
+        <img
+          src={media.url}
+          alt={media.alt}
+          className="h-12 w-12 shrink-0 rounded-lg object-cover md:h-16 md:w-16"
+        />
+      )}
       {showText && <span className="min-w-0 flex-1 break-words">{label}</span>}
     </button>
   );

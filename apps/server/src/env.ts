@@ -21,6 +21,8 @@ export type AppConfig = {
   initialOrganizerPassword: string | undefined;
   /** COUNTDOWN phase length; overridable in tests. */
   countdownMs: number;
+  /** Max image upload size, megabytes. */
+  maxUploadMb: number;
 };
 
 export function getConfig(): AppConfig {
@@ -38,5 +40,6 @@ export function getConfig(): AppConfig {
     initialOrganizerEmail: process.env.INITIAL_ORGANIZER_EMAIL,
     initialOrganizerPassword: process.env.INITIAL_ORGANIZER_PASSWORD,
     countdownMs: Number(process.env.COUNTDOWN_MS ?? 5000),
+    maxUploadMb: Number(process.env.MAX_UPLOAD_MB ?? 5),
   };
 }

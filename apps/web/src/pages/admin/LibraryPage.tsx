@@ -1,6 +1,7 @@
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../../lib/api';
+import { api } from '../../lib/api';
 import { Button } from '../../components/Button';
 import { Panel } from '../../components/Panel';
 
@@ -52,29 +53,46 @@ export function LibraryPage() {
     mutationFn: (id: string) => api(`/quizzes/${id}`, { method: 'DELETE' }),
     onSuccess: invalidate,
   });
-  const host = useMutation({
-    mutationFn: (quizId: string) =>
-      api<{ id: string; pin: string }>('/sessions', { method: 'POST', body: { quizId } }),
-    onSuccess: (d) => {
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importJson = async (file: File) => {
+    setImportError(null);
+    try {
+      const body = JSON.parse(await file.text());
+      await api('/quizzes/import', { method: 'POST', body });
       invalidate();
-      navigate(`/admin/host/${d.id}`);
-    },
-    onError: (e) => {
-      if (e instanceof ApiError && e.status === 400) {
-        alert('This quiz is not playable yet — open it to fix validation issues.');
-      }
-    },
-  });
+    } catch {
+      setImportError('Import failed — expected an ictquiz-v1 export file.');
+    } finally {
+      if (importRef.current) importRef.current.value = '';
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-3xl font-black">Quiz library</h1>
-          <Button onClick={() => createQuiz.mutate()} disabled={createQuiz.isPending}>
-            Create quiz
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              ref={importRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importJson(f);
+              }}
+            />
+            <Button variant="ghost" onClick={() => importRef.current?.click()}>
+              Import JSON
+            </Button>
+            <Button onClick={() => createQuiz.mutate()} disabled={createQuiz.isPending}>
+              Create quiz
+            </Button>
+          </div>
         </div>
+        {importError && <p className="mb-4 text-danger">{importError}</p>}
         {quizzes.isLoading && <p className="text-white/60">Loading…</p>}
         {quizzes.data && quizzes.data.quizzes.length === 0 && (
           <Panel className="text-white/60">No quizzes yet — create your first one.</Panel>
@@ -94,12 +112,18 @@ export function LibraryPage() {
                   {new Date(q.updatedAt).toLocaleString()}
                 </p>
               </div>
-              <Button variant="primary" onClick={() => host.mutate(q.id)} disabled={host.isPending}>
+              <Button
+                variant="primary"
+                onClick={() => navigate(`/admin/sessions/new?quizId=${q.id}`)}
+              >
                 Host session
               </Button>
               <Button variant="ghost" onClick={() => navigate(`/admin/quizzes/${q.id}`)}>
                 Open
               </Button>
+              <a href={`/api/quizzes/${q.id}/export`} download>
+                <Button variant="ghost">Export JSON</Button>
+              </a>
               <Button variant="ghost" onClick={() => duplicate.mutate(q.id)}>
                 Duplicate
               </Button>

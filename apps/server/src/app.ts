@@ -17,6 +17,7 @@ import type { RoomManager } from './engine/manager.js';
 import { attachSockets } from './socket/index.js';
 import { authRoutes } from './routes/auth.js';
 import { quizRoutes } from './routes/quizzes.js';
+import { mediaRoutes } from './routes/media.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { publicRoutes } from './routes/public.js';
 
@@ -152,6 +153,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     async (api) => {
       await api.register(authRoutes);
       await api.register(quizRoutes);
+      await api.register(mediaRoutes);
       await api.register(sessionRoutes);
       await api.register(publicRoutes);
     },

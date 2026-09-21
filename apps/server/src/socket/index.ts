@@ -53,13 +53,16 @@ export function attachSockets(app: FastifyInstance): void {
     maxHttpBufferSize: 64 * 1024,
   });
 
+  const managerRef: { current?: RoomManager } = {};
   const rooms = new RoomManager({
     prisma: app.prisma,
     io,
     countdownMs: app.config.countdownMs,
     publicUrl: app.config.publicUrl,
     recordError,
+    onTerminal: (sessionId) => managerRef.current?.scheduleEvict(sessionId),
   });
+  managerRef.current = rooms;
 
   app.decorate('io', io);
   app.decorate('rooms', rooms);
@@ -205,6 +208,14 @@ export function attachSockets(app: FastifyInstance): void {
         const room = await rooms.getOrLoad(session.id);
         const result = await room.join(nn);
         if (!result.ok) return ack(result satisfies PlayerJoinResult);
+
+        // One socket = one participant: shed a previous join first.
+        const prev = socket.data as SocketData;
+        if (prev.participantId && prev.sessionId) {
+          socket.leave(`p:${prev.participantId}`);
+          socket.leave(`s:${prev.sessionId}:players`);
+          rooms.get(prev.sessionId)?.detachSocket(prev.participantId, socket.id);
+        }
 
         socket.data = {
           role: 'player',

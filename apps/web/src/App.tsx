@@ -5,7 +5,9 @@ import { PlayPage } from './pages/PlayPage';
 import { DisplayPage } from './pages/DisplayPage';
 import { LoginPage } from './pages/admin/LoginPage';
 import { LibraryPage } from './pages/admin/LibraryPage';
-import { QuizViewPage } from './pages/admin/QuizViewPage';
+import { QuizEditorPage } from './pages/admin/QuizEditorPage';
+import { QuizPreviewPage } from './pages/admin/QuizPreviewPage';
+import { SessionNewPage } from './pages/admin/SessionNewPage';
 import { HostPage } from './pages/admin/HostPage';
 import { DiagnosticsPage } from './pages/admin/DiagnosticsPage';
 import { RequireAuth } from './components/RequireAuth';
@@ -40,7 +42,23 @@ export function App() {
           path="/admin/quizzes/:id"
           element={
             <Admin>
-              <QuizViewPage />
+              <QuizEditorPage />
+            </Admin>
+          }
+        />
+        <Route
+          path="/admin/quizzes/:id/preview"
+          element={
+            <Admin>
+              <QuizPreviewPage />
+            </Admin>
+          }
+        />
+        <Route
+          path="/admin/sessions/new"
+          element={
+            <Admin>
+              <SessionNewPage />
             </Admin>
           }
         />

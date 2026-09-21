@@ -33,6 +33,11 @@ export function PlayPage() {
   const [pending, setPending] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [answerError, setAnswerError] = useState<string | null>(null);
+  // Bridges the gap between the ack and the resynced me.submission snapshot.
+  const [submittedFor, setSubmittedFor] = useState<{
+    attemptId: string;
+    optionIds: string[];
+  } | null>(null);
 
   const creds = loadStoredPlayer();
 
@@ -61,6 +66,7 @@ export function PlayPage() {
     setSelected([]);
     setAnswerError(null);
     setPending(false);
+    setSubmittedFor(null);
   }, [attemptId]);
 
   const submit = async (optionIds: string[]) => {
@@ -73,6 +79,9 @@ export function PlayPage() {
         submissionId: crypto.randomUUID(),
         optionIds,
       });
+      if (res.status === 'accepted' || res.status === 'duplicate') {
+        setSubmittedFor({ attemptId, optionIds });
+      }
       if (res.status === 'rejected') {
         setAnswerError(
           res.reason === 'CLOSED' || res.reason === 'LATE'
@@ -108,7 +117,7 @@ export function PlayPage() {
   const me = snapshot?.me;
   const question = snapshot?.question;
   const showText = question?.showTextOnPlayer ?? false;
-  const submitted = !!me?.submission;
+  const submitted = !!me?.submission || submittedFor?.attemptId === attemptId;
 
   let body: React.ReactNode;
   if (!snapshot) {
@@ -136,11 +145,30 @@ export function PlayPage() {
         break;
       case 'QUESTION_OPEN':
         if (submitted) {
+          const chosenIds = me?.submission?.optionIds ?? submittedFor?.optionIds ?? [];
+          const chosen = question?.options.filter((o) => chosenIds.includes(o.id)) ?? [];
           body = (
-            <>
+            <div className="flex w-full flex-col items-center gap-4">
               <h1 className="mb-2 text-3xl font-black">Answer sent</h1>
               <p className="text-white/70">Waiting for the other players…</p>
-            </>
+              {chosen.length > 0 && (
+                <div
+                  className={`grid w-full gap-3 ${chosen.length <= 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}
+                >
+                  {chosen.map((o) => (
+                    <AnswerCard
+                      key={o.id}
+                      index={o.index}
+                      label={o.text}
+                      media={o.media}
+                      showText={showText}
+                      selected
+                      disabled
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           );
         } else if (!me?.canAnswer) {
           body = (
@@ -155,6 +183,13 @@ export function PlayPage() {
               {showText && (
                 <h2 className="mb-2 text-2xl font-black">{question.text}</h2>
               )}
+              {question.media && (
+                <img
+                  src={question.media.url}
+                  alt={question.media.alt}
+                  className="max-h-48 w-full rounded-2xl object-contain"
+                />
+              )}
               <div
                 className={`grid gap-3 ${question.options.length <= 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}
               >
@@ -163,6 +198,7 @@ export function PlayPage() {
                     key={o.id}
                     index={o.index}
                     label={o.text}
+                    media={o.media}
                     showText={showText}
                     selected={selected.includes(o.id)}
                     disabled={pending}

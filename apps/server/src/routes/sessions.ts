@@ -64,7 +64,35 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
 
     const settings: SessionSettings = body.settings;
-    const snapshot = buildQuizSnapshot(quiz, settings);
+
+    // Resolve media ids to served URLs before the snapshot is frozen.
+    const mediaIds = new Set<string>();
+    if (quiz.coverMediaId) mediaIds.add(quiz.coverMediaId);
+    for (const q of quiz.questions) {
+      if (q.mediaId) mediaIds.add(q.mediaId);
+      for (const o of q.options) if (o.mediaId) mediaIds.add(o.mediaId);
+    }
+    const assets = mediaIds.size
+      ? await app.prisma.mediaAsset.findMany({
+          where: { id: { in: [...mediaIds] }, organizerId: req.organizerId },
+        })
+      : [];
+    const mediaBy = new Map(
+      assets.map((a) => [a.id, { url: `/media/${a.storagePath}`, alt: a.altText }]),
+    );
+    const resolvedQuiz = {
+      ...quiz,
+      coverUrl: quiz.coverMediaId ? (mediaBy.get(quiz.coverMediaId)?.url ?? null) : null,
+      questions: quiz.questions.map((q) => ({
+        ...q,
+        media: q.mediaId ? (mediaBy.get(q.mediaId) ?? null) : null,
+        options: q.options.map((o) => ({
+          ...o,
+          media: o.mediaId ? (mediaBy.get(o.mediaId) ?? null) : null,
+        })),
+      })),
+    };
+    const snapshot = buildQuizSnapshot(resolvedQuiz, settings);
     const displayKey = randomBytes(16).toString('base64url');
 
     for (let attempt = 0; ; attempt++) {

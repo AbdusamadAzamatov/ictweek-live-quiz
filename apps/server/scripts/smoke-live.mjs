@@ -97,7 +97,7 @@ const send = (s, attemptId, submissionId, optionIds) =>
 // 4. host + players
 const host = await connect({ role: 'host', sessionId }, { extraHeaders: { cookie } });
 const hs = snaps(host);
-const p1s = await connect({ role: 'player' }); const p1snaps = snaps(p1s);
+const p1s = await connect({ role: 'player' }); snaps(p1s);
 const p2s = await connect({ role: 'player' }); const p2snaps = snaps(p2s);
 const j1 = await join(p1s, 'Alice'); const j2 = await join(p2s, 'Bob');
 log('join acks:', j1.status ?? 'ok', j2.status ?? 'ok', '| players:', j1.participantId?.slice(0,8), j2.participantId?.slice(0,8));

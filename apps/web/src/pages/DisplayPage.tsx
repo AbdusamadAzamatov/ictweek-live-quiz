@@ -114,6 +114,13 @@ function QuestionOpen({
             >
               <span className="text-3xl">{st.shape}</span>
               <span className="font-black">{st.letter}</span>
+              {o.media && (
+                <img
+                  src={o.media.url}
+                  alt={o.media.alt}
+                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                />
+              )}
               <span className="min-w-0 flex-1 break-words">{o.text}</span>
             </div>
           );
@@ -152,6 +159,13 @@ function AnswerReveal({ snap }: { snap: GameSnapshot }) {
               >
                 <span className="text-2xl">{st.shape}</span>
                 <span>{st.letter}</span>
+                {o.media && (
+                  <img
+                    src={o.media.url}
+                    alt={o.media.alt}
+                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                  />
+                )}
                 <span className="min-w-0 flex-1 break-words">{o.text}</span>
                 {correct && <span className="text-2xl">✓</span>}
               </div>
@@ -208,31 +222,32 @@ function Leaderboard({ snap }: { snap: GameSnapshot }) {
 
 function Podium({ snap }: { snap: GameSnapshot }) {
   const top = snap.leaderboard ?? [];
-  const order = [top[2], top[0], top[1]].filter(Boolean); // 3rd, 1st, 2nd columns
-  const heights = [110, 190, 150];
-  const delays = [0, 1.2, 0.6]; // staged 3 → 2 → 1
+  // Fixed rank→column slots so fewer than 3 players keeps the right blocks.
+  const columns = [
+    { rank: 3, p: top[2], height: 110, delay: 0 },
+    { rank: 1, p: top[0], height: 190, delay: 1.2 },
+    { rank: 2, p: top[1], height: 150, delay: 0.6 },
+  ];
   return (
     <div className="flex w-full flex-col items-center gap-8">
       <h1 className="text-5xl font-black">Podium</h1>
       <div className="flex items-end gap-6">
-        {order.map((p, i) => (
-          <div key={p!.participantId} className="flex w-52 flex-col items-center gap-3">
-            <p className="podium-name text-2xl font-bold" style={{ animationDelay: `${delays[i]}s` }}>
-              {p!.nickname}
+        {columns.map(({ rank, p, height, delay }) => (
+          <div key={rank} className="flex w-52 flex-col items-center gap-3">
+            <p className="podium-name text-2xl font-bold" style={{ animationDelay: `${delay}s` }}>
+              {p?.nickname ?? ''}
             </p>
             <p
               className="podium-name text-xl text-cyan tabular-nums"
-              style={{ animationDelay: `${delays[i]}s` }}
+              style={{ animationDelay: `${delay}s` }}
             >
-              {p!.score}
+              {p ? p.score : ''}
             </p>
             <div
               className="podium-block w-full rounded-t-2xl bg-brand"
-              style={{ height: heights[i], animationDelay: `${delays[i]}s` }}
+              style={{ height, animationDelay: `${delay}s`, opacity: p ? 1 : 0.25 }}
             >
-              <p className="pt-3 text-center text-4xl font-black">
-                {i === 1 ? '1' : i === 2 ? '2' : '3'}
-              </p>
+              <p className="pt-3 text-center text-4xl font-black">{rank}</p>
             </div>
           </div>
         ))}

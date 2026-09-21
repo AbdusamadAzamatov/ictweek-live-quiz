@@ -1,6 +1,12 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { QuizDraftSchema, validateQuizForPlay, type QuizDraft } from '@ictquiz/shared';
+import {
+  CSV_TEMPLATE,
+  QuizDraftSchema,
+  csvToQuestionDrafts,
+  validateQuizForPlay,
+  type QuizDraft,
+} from '@ictquiz/shared';
 import { parse } from '../lib/validate.js';
 import { requireOrganizer } from '../plugins/auth.js';
 import type { Db } from '../lib/db.js';
@@ -193,6 +199,103 @@ export async function quizRoutes(app: FastifyInstance) {
           })),
         })),
       },
+    };
+  });
+
+  app.get('/import-template.csv', async (_req, reply) => {
+    reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', 'attachment; filename="ictquiz-template.csv"');
+    return CSV_TEMPLATE;
+  });
+
+  const readCsvUpload = async (req: FastifyRequest): Promise<Buffer | null> => {
+    const file = await req.file({ limits: { fileSize: 1024 * 1024, files: 1 } });
+    if (!file) return null;
+    try {
+      return await file.toBuffer();
+    } catch {
+      return null;
+    }
+  };
+
+  app.post('/quizzes/:id/import-csv/preview', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const quiz = await app.prisma.quiz.findFirst({
+      where: { id, organizerId: req.organizerId },
+      select: { id: true },
+    });
+    if (!quiz) return reply.code(404).send({ error: 'Quiz not found' });
+    const buf = await readCsvUpload(req);
+    if (!buf) return reply.code(400).send({ error: 'CSV file required (max 1 MB)' });
+    let text: string;
+    try {
+      text = buf.toString('utf8');
+    } catch {
+      return reply.code(400).send({ error: 'CSV must be UTF-8' });
+    }
+    let parsed;
+    try {
+      parsed = csvToQuestionDrafts(text);
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
+    return { questions: parsed.questions, errors: parsed.errors };
+  });
+
+  app.post('/quizzes/:id/import-csv', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const quiz = await findOwnedQuiz(app.prisma, id, req.organizerId!);
+    if (!quiz) return reply.code(404).send({ error: 'Quiz not found' });
+    const buf = await readCsvUpload(req);
+    if (!buf) return reply.code(400).send({ error: 'CSV file required (max 1 MB)' });
+    let parsed;
+    try {
+      parsed = csvToQuestionDrafts(buf.toString('utf8'));
+    } catch (e) {
+      return reply.code(400).send({ error: (e as Error).message });
+    }
+
+    const baseOrder = quiz.questions.length;
+    if (parsed.questions.length > 0) {
+      await app.prisma.$transaction(async (tx) => {
+        for (const [i, q] of parsed.questions.entries()) {
+          await tx.question.create({
+            data: {
+              quizId: id,
+              order: baseOrder + i,
+              type: q.type,
+              text: q.text,
+              mediaId: q.mediaId ?? null,
+              timeLimitSec: q.timeLimitSec,
+              pointsMode: q.pointsMode,
+              explanation: q.explanation,
+              options: {
+                create: q.options.map((o, oi) => ({
+                  order: oi,
+                  text: o.text,
+                  mediaId: o.mediaId ?? null,
+                  isCorrect: o.isCorrect,
+                })),
+              },
+            },
+          });
+        }
+        await tx.quiz.update({ where: { id }, data: { updatedAt: new Date() } });
+      });
+    }
+
+    const saved = await app.prisma.quiz.findUniqueOrThrow({
+      where: { id },
+      include: quizInclude,
+    });
+    const dto = quizDto(saved);
+    return {
+      quiz: dto,
+      playIssues: validateQuizForPlay(dto),
+      imported: parsed.questions.length,
+      skipped: parsed.errors.length,
+      errors: parsed.errors,
     };
   });
 

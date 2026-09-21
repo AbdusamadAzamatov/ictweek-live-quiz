@@ -16,7 +16,7 @@ const chrome = spawn(CHROME, [
   '--user-data-dir=/tmp/ictquiz-shot-profile', '--window-size=1440,900',
   '--hide-scrollbars', 'about:blank',
 ], { stdio: 'ignore' });
-process.on('exit', () => { try { chrome.kill(); } catch {} });
+process.on('exit', () => chrome.kill());
 await new Promise((r) => setTimeout(r, 1500));
 
 const version = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`)).json();
@@ -33,7 +33,11 @@ const send = (method, params = {}, sessionId) =>
   new Promise((res, rej) => {
     const id = ++seq;
     const to = setTimeout(() => { pending.delete(id); rej(new Error(`${method}: no response`)); }, 15000);
-    pending.set(id, (m) => { clearTimeout(to); m.error ? rej(new Error(`${method}: ${m.error.message}`)) : res(m.result); });
+    pending.set(id, (m) => {
+      clearTimeout(to);
+      if (m.error) rej(new Error(`${method}: ${m.error.message}`));
+      else res(m.result);
+    });
     ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
   });
 ws.onclose = () => { console.error('chrome ws closed'); process.exit(2); };
@@ -63,14 +67,6 @@ const shot = async (s, name) => {
   }
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const waitText = async (s, text, timeout = 20000) => {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeout) {
-    if (await evalJs(s, `document.body.innerText.includes(${JSON.stringify(text)})`)) return true;
-    await sleep(300);
-  }
-  throw new Error(`timeout waiting text "${text}"`);
-};
 
 // --- game driver sockets -----------------------------------------------------
 const { io } = await import('socket.io-client');

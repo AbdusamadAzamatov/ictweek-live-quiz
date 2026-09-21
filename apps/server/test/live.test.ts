@@ -232,6 +232,31 @@ describe('live game engine', () => {
     expect(count).toBe(1);
   });
 
+  it('returns the original ack when a retry lands after the question closed', async () => {
+    const { url, sid, session } = await setup();
+    const host = track(await hostClient(url, sid, session.id));
+    const p1 = track(await joinPlayer(url, session.pin, 'P1'));
+    track(await joinPlayer(url, session.pin, 'P2'));
+    await hostCmd(host, 'c-s', 'START');
+    const open = await waitForState(host.snaps, 'QUESTION_OPEN');
+    const att = open.question!.attemptId;
+    const opt = open.question!.options[0]!.id;
+
+    const a1 = await answer(p1, att, 'retry-1', [opt]);
+    expect(a1.status).toBe('accepted');
+
+    await hostCmd(host, 'c-close', 'CLOSE_ANSWERS');
+    await waitForState(host.snaps, 'ANSWER_REVEAL');
+
+    // Same payload after close → the original accepted ack, not CLOSED.
+    expect(await answer(p1, att, 'retry-1', [opt])).toEqual(a1);
+    // Different submissionId after close → duplicate, not CLOSED.
+    expect(await answer(p1, att, 'retry-2', [opt])).toEqual({
+      status: 'duplicate',
+      submissionId: 'retry-1',
+    });
+  });
+
   it('rejects stale, closed and malformed answers', async () => {
     const { url, sid, session } = await setup();
     const host = track(await hostClient(url, sid, session.id));

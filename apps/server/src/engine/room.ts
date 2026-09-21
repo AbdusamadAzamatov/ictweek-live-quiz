@@ -85,6 +85,8 @@ export type RoomDeps = {
   countdownMs: number;
   publicUrl: string;
   recordError: (err: unknown) => void;
+  /** Called once when the room reaches FINISHED or CANCELLED. */
+  onTerminal?: (sessionId: string) => void;
 };
 
 export type HydratedRoom = {
@@ -197,6 +199,11 @@ export class GameRoom {
         submissions: subs,
       };
     }
+    // A hydrated LEADERBOARD/FINISHED room must serve its standings at once
+    // (deltas are 0 — previous ranks are not persisted).
+    if (this.state === 'LEADERBOARD' || this.state === 'FINISHED') {
+      this.computeLeaderboard();
+    }
   }
 
   // ------------------------------------------------------------------
@@ -308,7 +315,7 @@ export class GameRoom {
         lastSeenAt: created.lastSeenAt,
         sockets: new Set(),
       });
-      this.emitState();
+      this.emitStateHostDisplay();
       this.scheduleLobby();
       return { ok: true, participantId: created.id, resumeToken } as const;
     });
@@ -329,6 +336,21 @@ export class GameRoom {
         return { status: 'rejected', reason: 'UNAUTHORIZED' } as const;
       }
       const attempt = this.attempt;
+      // Idempotent retry wins over state/deadline checks (§5): a client that
+      // retries after the attempt closed must get its original ack back.
+      if (attempt && attempt.id === req.attemptId) {
+        const prior = attempt.submissions.get(participantId);
+        if (prior) {
+          if (prior.submissionId === req.submissionId) {
+            return {
+              status: 'accepted',
+              submissionId: prior.submissionId,
+              receivedAt: prior.receivedAt.toISOString(),
+            } as const;
+          }
+          return { status: 'duplicate', submissionId: prior.submissionId } as const;
+        }
+      }
       if (
         this.state !== 'QUESTION_OPEN' ||
         !attempt ||
@@ -548,7 +570,8 @@ export class GameRoom {
       } else if (sub && sub.points > 0) {
         next.score += sub.points;
       }
-      return { id: p.id, ...next };
+      // Rows with no submission and a zero streak would be written unchanged.
+      return { id: p.id, dirty: sub != null || p.streak !== 0, ...next };
     });
 
     await this.persist({
@@ -567,6 +590,7 @@ export class GameRoom {
           data: { status: 'CLOSED', closedAt: new Date() },
         });
         for (const u of updates) {
+          if (!u.dirty) continue;
           await tx.participant.update({
             where: { id: u.id },
             data: {
@@ -619,6 +643,7 @@ export class GameRoom {
     });
     this.endedAt = new Date();
     this.clearTimers();
+    this.deps.onTerminal?.(this.sessionId);
     return { ok: true, revision: this.revision };
   }
 
@@ -633,6 +658,7 @@ export class GameRoom {
     });
     this.endedAt = new Date();
     this.clearTimers();
+    this.deps.onTerminal?.(this.sessionId);
     return { ok: true, revision: this.revision };
   }
 
@@ -643,8 +669,10 @@ export class GameRoom {
       state: this.state,
       set: { locked },
       event: locked ? 'LOCK_LOBBY' : 'UNLOCK_LOBBY',
+      emit: false,
     });
     this.locked = locked;
+    this.emitStateHostDisplay();
     return { ok: true, revision: this.revision };
   }
 
@@ -751,6 +779,16 @@ export class GameRoom {
       if (p.status !== 'ACTIVE' || p.sockets.size === 0) continue;
       io.to(`p:${p.id}`).emit(EV.State, this.buildSnapshot('player', p.id, ranked));
     }
+  }
+
+  /** Host + display only — for changes players don't need pushed (joins, lock). */
+  private emitStateHostDisplay(): void {
+    const { io } = this.deps;
+    const ranked = this.ranked();
+    io.to(`s:${this.sessionId}:host`).emit(EV.State, this.buildSnapshot('host', undefined, ranked));
+    io
+      .to(`s:${this.sessionId}:display`)
+      .emit(EV.State, this.buildSnapshot('display', undefined, ranked));
   }
 
   // ------------------------------------------------------------------

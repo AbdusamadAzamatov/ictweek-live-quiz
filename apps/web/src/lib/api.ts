@@ -21,3 +21,27 @@ export async function api<T = unknown>(
   if (!res.ok) throw new ApiError(res.status, data);
   return data as T;
 }
+
+/** Multipart upload — no JSON content-type so the browser sets the boundary. */
+export async function apiUpload<T = unknown>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(path.startsWith('/api') ? path : `/api${path}`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    body: form,
+  });
+  const data: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, data);
+  return data as T;
+}
+
+export type MediaRef = { url: string; alt: string };
+
+export type MediaAssetDto = {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+  altText: string;
+};

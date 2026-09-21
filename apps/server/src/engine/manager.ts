@@ -8,6 +8,9 @@ export class RoomManager {
   private rooms = new Map<string, GameRoom>();
   /** Serializes hydration so two sockets can't race-create a room. */
   private loading = new Map<string, Promise<GameRoom>>();
+  private evictTimers = new Map<string, NodeJS.Timeout>();
+  /** Terminal rooms are dropped this long after finishing. */
+  evictMs = 15 * 60 * 1000;
 
   constructor(private deps: RoomDeps) {}
 
@@ -54,7 +57,25 @@ export class RoomManager {
       attempt,
     });
     this.rooms.set(sessionId, room);
+    const state = room.getState();
+    if (state === 'FINISHED' || state === 'CANCELLED') this.scheduleEvict(sessionId);
     return room;
+  }
+
+  /**
+   * Drop a terminal room from the map after `evictMs`; a later socket
+   * re-hydrates it via getOrLoad.
+   */
+  scheduleEvict(sessionId: string): void {
+    if (this.evictTimers.has(sessionId)) return;
+    this.evictTimers.set(
+      sessionId,
+      setTimeout(() => {
+        this.evictTimers.delete(sessionId);
+        this.rooms.get(sessionId)?.dispose();
+        this.rooms.delete(sessionId);
+      }, this.evictMs),
+    );
   }
 
   /**
@@ -92,6 +113,8 @@ export class RoomManager {
   }
 
   dispose(): void {
+    for (const t of this.evictTimers.values()) clearTimeout(t);
+    this.evictTimers.clear();
     for (const room of this.rooms.values()) room.dispose();
   }
 }

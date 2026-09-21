@@ -291,6 +291,13 @@ export function HostPage() {
                     size={72}
                   />
                 </div>
+                {q.media && (
+                  <img
+                    src={q.media.url}
+                    alt={q.media.alt}
+                    className="mb-3 max-h-40 rounded-xl object-contain"
+                  />
+                )}
                 <div className="grid gap-2 sm:grid-cols-2">
                   {q.options.map((o) => {
                     const st = answerStyle(o.index);
@@ -306,6 +313,13 @@ export function HostPage() {
                       >
                         <span>{st.shape}</span>
                         <span>{st.letter}</span>
+                        {o.media && (
+                          <img
+                            src={o.media.url}
+                            alt={o.media.alt}
+                            className="h-9 w-9 shrink-0 rounded-lg object-cover"
+                          />
+                        )}
                         <span className="min-w-0 flex-1 truncate">{o.text}</span>
                         {o.isCorrect && <span>✓</span>}
                       </div>
