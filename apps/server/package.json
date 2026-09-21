@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "create-organizer": "tsx --conditions=development src/scripts/create-organizer.ts",
+    "set-password": "tsx --conditions=development src/scripts/set-password.ts",
     "load-test": "tsx --conditions=development scripts/load-test.ts"
   },
   "dependencies": {

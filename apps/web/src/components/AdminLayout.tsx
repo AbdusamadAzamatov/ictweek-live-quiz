@@ -34,6 +34,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <Link to="/admin/diagnostics" className="hover:text-white">
             Diagnostics
           </Link>
+          <Link to="/admin/account" className="hover:text-white">
+            Account
+          </Link>
           <span className="hidden sm:inline">{me.data?.organizer.email}</span>
           <button
             onClick={() => logout.mutate()}
@@ -43,6 +46,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </button>
         </nav>
       </header>
+      {me.data?.organizer.mustChangePassword ? (
+        <div className="border-b border-yellow-400/40 bg-yellow-400/15 px-6 py-2.5 text-sm font-semibold text-yellow-200">
+          You are still using the initial password from the server configuration.{' '}
+          <Link to="/admin/account" className="underline hover:text-yellow-100">
+            Change it now →
+          </Link>
+        </div>
+      ) : null}
       <main className="mx-auto max-w-5xl p-6">{children}</main>
     </div>
   );

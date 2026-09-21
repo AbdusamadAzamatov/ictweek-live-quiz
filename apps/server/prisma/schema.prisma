@@ -48,10 +48,11 @@ enum AttemptStatus {
 }
 
 model Organizer {
-  id           String             @id @default(uuid())
-  email        String             @unique
-  passwordHash String
-  createdAt    DateTime           @default(now())
+  id                String             @id @default(uuid())
+  email             String             @unique
+  passwordHash      String
+  passwordChangedAt DateTime? // null while the bootstrap INITIAL_ORGANIZER_* password is still in use
+  createdAt         DateTime           @default(now())
   sessions     OrganizerSession[]
   quizzes      Quiz[]
   media        MediaAsset[]

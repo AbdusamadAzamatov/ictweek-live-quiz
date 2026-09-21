@@ -17,8 +17,13 @@ const prisma = createPrisma(getConfig().databaseUrl);
 const passwordHash = await argonHash(password);
 const organizer = await prisma.organizer.upsert({
   where: { email: email.toLowerCase() },
-  create: { email: email.toLowerCase(), passwordHash },
-  update: { passwordHash },
+  create: {
+    email: email.toLowerCase(),
+    passwordHash,
+    // deliberately chosen password — not the bootstrap one
+    passwordChangedAt: new Date(),
+  },
+  update: { passwordHash, passwordChangedAt: new Date() },
 });
 console.log(`organizer ${organizer.email} ${organizer.createdAt ? 'saved' : 'created'}`);
 await prisma.$disconnect();

@@ -3,7 +3,9 @@ import { Navigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 
-export type Me = { organizer: { id: string; email: string; createdAt: string } };
+export type Me = {
+  organizer: { id: string; email: string; createdAt: string; mustChangePassword: boolean };
+};
 
 export function useMe() {
   return useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/auth/me'), retry: false });

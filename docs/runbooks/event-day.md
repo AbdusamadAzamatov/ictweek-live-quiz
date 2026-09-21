@@ -6,8 +6,11 @@
       `healthy`; `curl https://<DOMAIN>/api/health` → `{"ok":true}`.
 - [ ] Quiz is imported/created and passes play validation (no `playIssues` —
       run it through the editor's Preview once).
-- [ ] One real phone on the **venue Wi-Fi** joins a test session from the QR /
-      join link and answers a question end-to-end.
+- [ ] One real phone joins a test session from the QR / join link and answers
+      a question end-to-end. If the event server is not deployed yet, rehearse
+      against your laptop over the LAN first — see `lan-rehearsal.md` (phones
+      cannot reach `localhost` on another machine). For the event itself, use
+      the real domain `https://<DOMAIN>`.
 - [ ] Projector laptop: open `/display/<displayKey>` fullscreen (`F` on the
       host page, or the browser's own fullscreen) at 1080p; type is readable
       from the back of the room.

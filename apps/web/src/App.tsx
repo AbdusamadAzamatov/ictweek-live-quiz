@@ -11,6 +11,7 @@ import { SessionNewPage } from './pages/admin/SessionNewPage';
 import { HostPage } from './pages/admin/HostPage';
 import { SessionReportPage } from './pages/admin/SessionReportPage';
 import { DiagnosticsPage } from './pages/admin/DiagnosticsPage';
+import { AccountPage } from './pages/admin/AccountPage';
 import { RequireAuth } from './components/RequireAuth';
 import { AdminLayout } from './components/AdminLayout';
 
@@ -84,6 +85,14 @@ export function App() {
           element={
             <Admin>
               <DiagnosticsPage />
+            </Admin>
+          }
+        />
+        <Route
+          path="/admin/account"
+          element={
+            <Admin>
+              <AccountPage />
             </Admin>
           }
         />

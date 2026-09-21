@@ -1,4 +1,4 @@
-import { verify as argonVerify } from '@node-rs/argon2';
+import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { SESSION_COOKIE, SESSION_TTL_MS, hashToken, newSessionToken } from '../lib/session.js';
@@ -10,8 +10,23 @@ const LoginSchema = z.object({
   password: z.string().min(1).max(1024),
 });
 
-export function organizerDto(o: { id: string; email: string; createdAt: Date }) {
-  return { id: o.id, email: o.email, createdAt: o.createdAt };
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(1024),
+  newPassword: z.string().min(10).max(1024),
+});
+
+export function organizerDto(o: {
+  id: string;
+  email: string;
+  createdAt: Date;
+  passwordChangedAt: Date | null;
+}) {
+  return {
+    id: o.id,
+    email: o.email,
+    createdAt: o.createdAt,
+    mustChangePassword: o.passwordChangedAt === null,
+  };
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -59,4 +74,37 @@ export async function authRoutes(app: FastifyInstance) {
   app.get('/auth/me', { preHandler: requireOrganizer }, async (req) => {
     return { organizer: organizerDto(req.organizer!) };
   });
+
+  app.post(
+    '/auth/change-password',
+    {
+      preHandler: requireOrganizer,
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const body = parse(ChangePasswordSchema, req.body);
+      const organizer = req.organizer!;
+      if (!(await argonVerify(organizer.passwordHash, body.currentPassword))) {
+        return reply.code(401).send({ error: 'Current password is incorrect' });
+      }
+      if (body.newPassword === body.currentPassword) {
+        return reply
+          .code(400)
+          .send({ error: 'New password must differ from the current password' });
+      }
+      const passwordHash = await argonHash(body.newPassword);
+      const currentSessionId = hashToken(req.cookies[SESSION_COOKIE] ?? '');
+      await app.prisma.$transaction([
+        app.prisma.organizer.update({
+          where: { id: organizer.id },
+          data: { passwordHash, passwordChangedAt: new Date() },
+        }),
+        // revoke every other session of this organizer
+        app.prisma.organizerSession.deleteMany({
+          where: { organizerId: organizer.id, id: { not: currentSessionId } },
+        }),
+      ]);
+      return { ok: true };
+    },
+  );
 }
