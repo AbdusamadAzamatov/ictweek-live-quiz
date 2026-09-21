@@ -6,3 +6,5 @@ media-test/
 coverage/
 apps/server/src/generated/
 *.log
+artifacts/
+load-results/

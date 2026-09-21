@@ -16,7 +16,7 @@ async function dbPing(app: FastifyInstance): Promise<{ ok: boolean; latencyMs: n
 export async function publicRoutes(app: FastifyInstance) {
   app.get(
     '/join/:pin',
-    { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } },
+    { config: { rateLimit: { max: 600, timeWindow: '1 minute' } } },
     async (req, reply) => {
       const { pin } = req.params as { pin: string };
       if (!/^\d{6}$/.test(pin)) return reply.code(404).send({ error: 'Not found' });
@@ -38,13 +38,19 @@ export async function publicRoutes(app: FastifyInstance) {
   });
 
   app.get('/diagnostics', { preHandler: requireOrganizer }, async () => {
+    const byRole: Record<string, number> = {};
+    let total = 0;
+    for (const socket of app.io.of('/').sockets.values()) {
+      total += 1;
+      const role = (socket.data as { role?: string }).role ?? 'unknown';
+      byRole[role] = (byRole[role] ?? 0) + 1;
+    }
     return {
       uptimeSec: Math.round(process.uptime()),
       memory: process.memoryUsage(),
       db: await dbPing(app),
-      // Filled by the Socket.IO layer in Phase 2.
-      sockets: { total: 0, byRole: {} },
-      rooms: { active: 0, list: [] },
+      sockets: { total, byRole },
+      rooms: app.rooms.diagnostics(),
       recentErrors: recentErrors(),
     };
   });

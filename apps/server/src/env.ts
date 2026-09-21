@@ -19,6 +19,8 @@ export type AppConfig = {
   isProduction: boolean;
   initialOrganizerEmail: string | undefined;
   initialOrganizerPassword: string | undefined;
+  /** COUNTDOWN phase length; overridable in tests. */
+  countdownMs: number;
 };
 
 export function getConfig(): AppConfig {
@@ -35,5 +37,6 @@ export function getConfig(): AppConfig {
     isProduction: process.env.NODE_ENV === 'production',
     initialOrganizerEmail: process.env.INITIAL_ORGANIZER_EMAIL,
     initialOrganizerPassword: process.env.INITIAL_ORGANIZER_PASSWORD,
+    countdownMs: Number(process.env.COUNTDOWN_MS ?? 5000),
   };
 }

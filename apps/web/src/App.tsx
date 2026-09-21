@@ -1,10 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { JoinPage } from './pages/JoinPage';
 import { JoinNicknamePage } from './pages/JoinNicknamePage';
+import { PlayPage } from './pages/PlayPage';
+import { DisplayPage } from './pages/DisplayPage';
 import { LoginPage } from './pages/admin/LoginPage';
 import { LibraryPage } from './pages/admin/LibraryPage';
 import { QuizViewPage } from './pages/admin/QuizViewPage';
-import { HostStubPage } from './pages/admin/HostStubPage';
+import { HostPage } from './pages/admin/HostPage';
 import { DiagnosticsPage } from './pages/admin/DiagnosticsPage';
 import { RequireAuth } from './components/RequireAuth';
 import { AdminLayout } from './components/AdminLayout';
@@ -23,6 +25,8 @@ export function App() {
       <Routes>
         <Route path="/" element={<JoinPage />} />
         <Route path="/join/:pin" element={<JoinNicknamePage />} />
+        <Route path="/play" element={<PlayPage />} />
+        <Route path="/display/:displayKey" element={<DisplayPage />} />
         <Route path="/admin/login" element={<LoginPage />} />
         <Route
           path="/admin"
@@ -44,7 +48,7 @@ export function App() {
           path="/admin/host/:id"
           element={
             <Admin>
-              <HostStubPage />
+              <HostPage />
             </Admin>
           }
         />

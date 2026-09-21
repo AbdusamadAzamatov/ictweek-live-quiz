@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { GameSnapshot } from './types.js';
 
 /** Socket.IO event names (client→server events all expect an ack callback). */
@@ -25,6 +26,46 @@ export type SocketAuth =
   | { role: 'display'; displayKey: string };
 
 export type SocketRole = SocketAuth['role'];
+
+// ---------------------------------------------------------------------------
+// Wire validation (server validates every inbound payload; ack codes below)
+// ---------------------------------------------------------------------------
+
+export const SocketAuthSchema = z.discriminatedUnion('role', [
+  z.object({
+    role: z.literal('player'),
+    participantId: z.string().min(1).optional(),
+    resumeToken: z.string().min(1).optional(),
+  }),
+  z.object({ role: z.literal('host'), sessionId: z.string().min(1) }),
+  z.object({ role: z.literal('display'), displayKey: z.string().min(1) }),
+]);
+
+export const PlayerJoinRequestSchema = z.object({
+  pin: z.string().max(16),
+  nickname: z.string().max(64),
+});
+
+export const PlayerAnswerRequestSchema = z.object({
+  attemptId: z.string().min(1).max(100),
+  submissionId: z.string().min(1).max(100),
+  optionIds: z.array(z.string().min(1).max(100)).max(12),
+});
+
+export const HostCommandRequestSchema = z.object({
+  commandId: z.string().min(1).max(100),
+  type: z.enum([
+    'START',
+    'CLOSE_ANSWERS',
+    'NEXT',
+    'LOCK_LOBBY',
+    'UNLOCK_LOBBY',
+    'REMOVE_PARTICIPANT',
+    'END',
+    'REPLAY_QUESTION',
+  ]),
+  payload: z.object({ participantId: z.string().min(1).optional() }).optional(),
+});
 
 // ---------------------------------------------------------------------------
 // Client → Server payloads + acks
@@ -64,11 +105,20 @@ export type PlayerAnswerResult =
   | { status: 'duplicate'; submissionId: string }
   | {
       status: 'rejected';
-      reason: 'UNAUTHORIZED' | 'STALE_ATTEMPT' | 'CLOSED' | 'LATE' | 'NOT_ELIGIBLE' | 'INVALID';
+      reason:
+        | 'UNAUTHORIZED'
+        | 'STALE_ATTEMPT'
+        | 'CLOSED'
+        | 'LATE'
+        | 'NOT_ELIGIBLE'
+        | 'INVALID'
+        | 'RATE_LIMITED';
     };
 
 export type StateSyncRequest = Record<string, never>;
-export type StateSyncResult = { ok: true; snapshot: GameSnapshot };
+export type StateSyncResult =
+  | { ok: true; snapshot: GameSnapshot }
+  | { ok: false; code: 'UNAUTHORIZED' | 'INVALID' };
 
 export type HostCommandType =
   | 'START'

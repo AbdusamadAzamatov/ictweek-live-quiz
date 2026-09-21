@@ -10,8 +10,11 @@ import { hash as argonHash } from '@node-rs/argon2';
 import { getConfig, type AppConfig } from './env.js';
 import { createPrisma } from './lib/db.js';
 import { recordError } from './lib/errors.js';
+import type { Server as SocketIOServer } from 'socket.io';
 import type { PrismaClient } from './generated/prisma/client.js';
 import type { OrganizerModel } from './generated/prisma/models.js';
+import type { RoomManager } from './engine/manager.js';
+import { attachSockets } from './socket/index.js';
 import { authRoutes } from './routes/auth.js';
 import { quizRoutes } from './routes/quizzes.js';
 import { sessionRoutes } from './routes/sessions.js';
@@ -21,6 +24,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     prisma: PrismaClient;
     config: AppConfig;
+    io: SocketIOServer;
+    rooms: RoomManager;
   }
   interface FastifyRequest {
     organizerId?: string;
@@ -44,15 +49,19 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   const app = fastify({
     logger: opts.logger ?? config.isProduction,
     trustProxy: process.env.TRUST_PROXY === '1',
+    // Socket.IO keeps long-lived connections open; force-close them on shutdown
+    // so app.close() doesn't hang waiting for polling/ws sockets to drain.
+    forceCloseConnections: true,
   });
   app.decorate('prisma', prisma);
   app.decorate('config', config);
 
   await app.register(fastifyCookie);
   await app.register(fastifyRateLimit, {
-    max: 1000,
-    timeWindow: '1 minute',
-    // specific routes tighten this (login 10/min, join 120/min)
+    global: false,
+    // Per-route limits only: a venue NAT means hundreds of phones share one IP,
+    // so nothing (esp. static/SPA/media) may be throttled globally.
+    // login 10/min, join 600/min — see route configs.
   });
   await app.register(fastifyMultipart, { limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -148,6 +157,19 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     },
     { prefix: '/api' },
   );
+
+  // Socket.IO + live rooms (attached to the underlying HTTP server).
+  attachSockets(app);
+
+  // Boot recovery: sessions with an active PIN are rehydrated; interrupted
+  // mid-question states become RECOVERY (DESIGN §5).
+  app.addHook('onReady', async () => {
+    try {
+      await app.rooms.restore();
+    } catch (e) {
+      recordError(e);
+    }
+  });
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
