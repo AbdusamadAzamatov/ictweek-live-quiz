@@ -289,11 +289,11 @@ Sessions:
 
 Public / ops:
 
-- `GET /join/:pin` (rate-limit 120/min/IP, PIN must be 6 digits) → `{ sessionId, title, locked, state }` or 404
+- `GET /join/:pin` (shared per-IP join limiter, PIN must be 6 digits) → `{ sessionId, title, locked, state }`, 404 on unknown PIN, or 429 `Too many attempts — wait a minute and try again`
 - `GET /health` → `{ ok, db }` (used by Docker healthcheck)
 - `GET /diagnostics` (organizer) → `{ uptimeSec, memory: process.memoryUsage(), db:{ ok, latencyMs }, sockets:{ total, byRole }, rooms:{ active, list:[{sessionId,pin,state,participants}] }, recentErrors:[{ at, message }] }` (ring buffer of last 50 errors from the Fastify error handler and engine).
 
-Rate limiting: `@fastify/rate-limit` keyed by IP with the generous limits above; Socket.IO join/answer are additionally limited per socket (join ≤ 5/min, answer ≤ 30/min) rather than per IP, so a venue NAT is never blocked as a whole.
+Rate limiting: `POST /auth/login` uses `@fastify/rate-limit` (10/min/IP). PIN lookups and `player:join` share one per-IP sliding-window limiter (`JoinLimiter`, `lib/join-limiter.ts`) across the HTTP and Socket.IO channels, so reconnecting does not reset the budget. A failed lookup (malformed or unknown PIN) counts toward `JOIN_FAIL_PER_MIN` (default 120/min) and `JOIN_FAIL_PER_HOUR` (default 1000/h); a successful join counts toward `JOIN_SUCCESS_PER_MIN` (default 1200/min) only. A limited IP gets `RATE_LIMITED`/`429` before any PIN is checked, so it learns nothing about PIN validity; `LOCKED`/`FULL`/`ENDED`/`NICKNAME_*` outcomes are never counted. Client IP is `req.ip` for HTTP and, for sockets, the first `x-forwarded-for` entry when `TRUST_PROXY=1` else `socket.handshake.address`. Socket.IO additionally keeps per-socket buckets (join ≤ 5/min, answer ≤ 30/min), so a venue NAT is never blocked as a whole while a single misbehaving connection still is.
 
 Production serving: Fastify serves `apps/web/dist` (SPA fallback to `index.html`, `/assets/*` immutable). Dev: Vite on :5173 proxies `/api`, `/media`, `/socket.io` (ws) to :3000.
 

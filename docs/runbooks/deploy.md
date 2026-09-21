@@ -43,6 +43,7 @@ git clone <repo-url> ictquiz && cd ictquiz
 cp docker/.env.example docker/.env
 nano docker/.env          # set DOMAIN, PUBLIC_URL, POSTGRES_PASSWORD, SESSION_SECRET,
                           # INITIAL_ORGANIZER_*
+sed -i "s/^#\?APP_TAG=.*/APP_TAG=$(git rev-parse --short HEAD)/" docker/.env
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 docker compose -f docker/compose.yml --env-file docker/.env ps
 ```
@@ -100,8 +101,14 @@ matching `DATABASE_URL`.)
 ```bash
 cd ictquiz
 git pull
+sed -i "s/^#\?APP_TAG=.*/APP_TAG=$(git rev-parse --short HEAD)/" docker/.env
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
 ```
+
+`APP_TAG` lives in `docker/.env` (never `export` it) so every `up -d` deploys
+the recorded sha. Keep at least the last two `ictquiz-app:<sha>` image tags —
+`docker image ls ictquiz-app` shows what is retained; never run
+`docker image prune -a` on the event host.
 
 The entrypoint applies new migrations automatically on start. Take a backup
 before every update (see `backup-restore.md`); see `rollback.md` for reverting.

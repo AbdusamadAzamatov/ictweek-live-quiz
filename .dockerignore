@@ -9,6 +9,7 @@ docker/backups
 apps/server/media
 apps/server/media-test
 apps/server/load-results
+.rbtest-*
 artifacts
 coverage
 **/*.log

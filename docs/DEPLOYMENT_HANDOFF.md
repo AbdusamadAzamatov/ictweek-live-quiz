@@ -41,7 +41,7 @@ Files that must exist on the server after this step: `docker/Dockerfile`, `docke
 | `MEDIA_DIR` | `/data/media` | Leave as is (named volume) |
 | `MAX_UPLOAD_MB` | `5` | Image upload limit |
 | `TRUST_PROXY` | `1` | Required behind the bundled Caddy so rate limits see client IPs |
-| `APP_TAG` | git short SHA of the deployed commit | Enables rollback (step 6) |
+| `APP_TAG` | git short SHA of the deployed commit | Source of truth for the deployed image; set by `sed` in `docker/.env` — never `export` it. Enables rollback (step 6) |
 
 ## 3. Server access and DNS
 
@@ -71,7 +71,7 @@ sudo ufw allow 80,443/tcp
 cd /opt/ictquiz
 cp docker/.env.example docker/.env
 nano docker/.env                     # section 2 values
-export APP_TAG=$(git rev-parse --short HEAD)
+sed -i "s/^#\?APP_TAG=.*/APP_TAG=$(git rev-parse --short HEAD)/" docker/.env
 
 # 4.3 Build and start (first build ≈ 3–6 min; entrypoint runs prisma migrate deploy)
 docker compose -f docker/compose.yml --env-file docker/.env up -d --build
@@ -124,15 +124,19 @@ in progress goes to **RECOVERY** and the host chooses *Replay question*.
 docker/backup.sh && docker/verify-backup.sh docker/backups/<ts>
 
 # roll the app back to the previous image (db/caddy untouched)
-export APP_TAG=<previous-sha>
-docker compose -f docker/compose.yml --env-file docker/.env up -d
+sed -i "s/^#\?APP_TAG=.*/APP_TAG=<previous-sha>/" docker/.env
+docker compose -f docker/compose.yml --env-file docker/.env up -d --no-build
 
 # if a migration must be undone (schema-level rollback): planned downtime
 docker/restore.sh --yes docker/backups/<pre-deploy-ts>   # DESTRUCTIVE: replaces live DB + media
-export APP_TAG=<sha matching that backup>; docker compose -f docker/compose.yml --env-file docker/.env up -d
+sed -i "s/^#\?APP_TAG=.*/APP_TAG=<sha matching that backup>/" docker/.env
+docker compose -f docker/compose.yml --env-file docker/.env up -d --no-build
 ```
 
-Migrations are forward-only; details in `docs/runbooks/rollback.md`.
+Keep the last two `ictquiz-app:<sha>` tags on the host (`docker image ls ictquiz-app`) and never run
+`docker image prune -a` on the event host — that deletes the rollback target. Rehearse the whole
+upgrade → rollback cycle without touching the live stack: `docker/rollback-rehearsal.sh <previous-sha>`.
+Migrations are forward-only; compatibility details in `docs/runbooks/rollback.md`.
 
 ## 7. Target-server load test (under the configured 2 GiB app limit)
 

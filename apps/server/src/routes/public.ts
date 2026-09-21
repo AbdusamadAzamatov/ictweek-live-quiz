@@ -14,22 +14,31 @@ async function dbPing(app: FastifyInstance): Promise<{ ok: boolean; latencyMs: n
 }
 
 export async function publicRoutes(app: FastifyInstance) {
-  app.get(
-    '/join/:pin',
-    { config: { rateLimit: { max: 600, timeWindow: '1 minute' } } },
-    async (req, reply) => {
-      const { pin } = req.params as { pin: string };
-      if (!/^\d{6}$/.test(pin)) return reply.code(404).send({ error: 'Not found' });
-      const session = await app.prisma.gameSession.findUnique({ where: { activePin: pin } });
-      if (!session) return reply.code(404).send({ error: 'Not found' });
-      return {
-        sessionId: session.id,
-        title: (session.quizSnapshot as QuizSnapshot | null)?.title ?? '',
-        locked: session.locked,
-        state: session.state,
-      };
-    },
-  );
+  app.get('/join/:pin', async (req, reply) => {
+    const ip = req.ip;
+    if (app.joinLimiter.check(ip) === 'limited') {
+      return reply
+        .code(429)
+        .send({ error: 'Too many attempts — wait a minute and try again' });
+    }
+    const { pin } = req.params as { pin: string };
+    if (!/^\d{6}$/.test(pin)) {
+      app.joinLimiter.recordFailure(ip);
+      return reply.code(404).send({ error: 'Not found' });
+    }
+    const session = await app.prisma.gameSession.findUnique({ where: { activePin: pin } });
+    if (!session) {
+      app.joinLimiter.recordFailure(ip);
+      return reply.code(404).send({ error: 'Not found' });
+    }
+    app.joinLimiter.recordSuccess(ip);
+    return {
+      sessionId: session.id,
+      title: (session.quizSnapshot as QuizSnapshot | null)?.title ?? '',
+      locked: session.locked,
+      state: session.state,
+    };
+  });
 
   app.get('/health', async (req, reply) => {
     const db = await dbPing(app);
@@ -51,6 +60,7 @@ export async function publicRoutes(app: FastifyInstance) {
       db: await dbPing(app),
       sockets: { total, byRole },
       rooms: app.rooms.diagnostics(),
+      joinLimiter: app.joinLimiter.stats(),
       recentErrors: recentErrors(),
     };
   });

@@ -8,6 +8,7 @@ import type {
   SocketAuth,
 } from '@ictquiz/shared';
 import { buildApp } from '../src/app.js';
+import type { AppConfig } from '../src/env.js';
 import { ORIGIN } from './helpers.js';
 import type { PrismaClient } from '../src/generated/prisma/client.js';
 
@@ -18,11 +19,12 @@ export type LiveApp = { app: FastifyInstance; url: string };
 export async function liveApp(opts?: {
   countdownMs?: number;
   prisma?: PrismaClient;
+  config?: Partial<AppConfig>;
 }): Promise<LiveApp> {
   const app = await buildApp({
     logger: false,
     prisma: opts?.prisma,
-    config: { countdownMs: opts?.countdownMs ?? 200 },
+    config: { countdownMs: opts?.countdownMs ?? 200, ...opts?.config },
   });
   await app.listen({ port: 0, host: '127.0.0.1' });
   const port = (app.server.address() as AddressInfo).port;

@@ -44,7 +44,8 @@ Runbooks in `docs/runbooks/`: [`deploy.md`](docs/runbooks/deploy.md),
 [`rollback.md`](docs/runbooks/rollback.md),
 [`event-day.md`](docs/runbooks/event-day.md). Samples in `docs/samples/`
 (`sample-quiz.json`, `import-template.csv`); parity notes in
-[`docs/PARITY_MATRIX.md`](docs/PARITY_MATRIX.md); measured results in
+[`docs/PARITY_MATRIX.md`](docs/PARITY_MATRIX.md); exact scoring and tie-break
+rules in [`docs/SCORING.md`](docs/SCORING.md); measured results in
 [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md). The original plan and prompt are
 kept in `docs/plan/`.
 

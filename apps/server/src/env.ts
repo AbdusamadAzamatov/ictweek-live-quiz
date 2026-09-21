@@ -23,6 +23,14 @@ export type AppConfig = {
   countdownMs: number;
   /** Max image upload size, megabytes. */
   maxUploadMb: number;
+  /** Trust X-Forwarded-For for client IPs (Caddy). */
+  trustProxy: boolean;
+  /** Shared join/PIN limiter budgets (DESIGN §7). */
+  joinFailPerMin: number;
+  joinFailPerHour: number;
+  joinSuccessPerMin: number;
+  /** Failure sliding-window override; tests only. */
+  joinFailWindowMs?: number;
 };
 
 export function getConfig(): AppConfig {
@@ -41,5 +49,12 @@ export function getConfig(): AppConfig {
     initialOrganizerPassword: process.env.INITIAL_ORGANIZER_PASSWORD,
     countdownMs: Number(process.env.COUNTDOWN_MS ?? 5000),
     maxUploadMb: Number(process.env.MAX_UPLOAD_MB ?? 5),
+    trustProxy: process.env.TRUST_PROXY === '1',
+    joinFailPerMin: Number(process.env.JOIN_FAIL_PER_MIN ?? 120),
+    joinFailPerHour: Number(process.env.JOIN_FAIL_PER_HOUR ?? 1000),
+    joinSuccessPerMin: Number(process.env.JOIN_SUCCESS_PER_MIN ?? 1200),
+    joinFailWindowMs: process.env.JOIN_FAIL_WINDOW_MS
+      ? Number(process.env.JOIN_FAIL_WINDOW_MS)
+      : undefined,
   };
 }

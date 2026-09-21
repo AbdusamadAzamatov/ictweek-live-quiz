@@ -15,6 +15,7 @@ import {
 } from '@ictquiz/shared';
 import { RoomManager } from '../engine/manager.js';
 import { recordError } from '../lib/errors.js';
+import { socketClientIp } from '../lib/join-limiter.js';
 import { SESSION_COOKIE, hashToken } from '../lib/session.js';
 
 type SocketData = {
@@ -182,6 +183,12 @@ export function attachSockets(app: FastifyInstance): void {
     socket.on('player:join', async (payload: unknown, ack: unknown) => {
       try {
         if (!isAck(ack)) return;
+        // Shared per-IP limiter first: a limited IP must learn nothing about
+        // PIN validity, so the check runs before any lookup or parsing.
+        const ip = socketClientIp(socket, app.config.trustProxy);
+        if (app.joinLimiter.check(ip) === 'limited') {
+          return ack({ ok: false, code: 'RATE_LIMITED' } satisfies PlayerJoinResult);
+        }
         if (!rateOk(socket.id, 'join')) {
           return ack({ ok: false, code: 'RATE_LIMITED' } satisfies PlayerJoinResult);
         }
@@ -190,6 +197,7 @@ export function attachSockets(app: FastifyInstance): void {
           return ack({ ok: false, code: 'NICKNAME_INVALID' } satisfies PlayerJoinResult);
         }
         if (!/^\d{6}$/.test(parsed.data.pin)) {
+          app.joinLimiter.recordFailure(ip);
           return ack({ ok: false, code: 'NOT_FOUND' } satisfies PlayerJoinResult);
         }
         const nn = normalizeNickname(parsed.data.nickname);
@@ -200,6 +208,7 @@ export function attachSockets(app: FastifyInstance): void {
           where: { activePin: parsed.data.pin },
         });
         if (!session) {
+          app.joinLimiter.recordFailure(ip);
           return ack({ ok: false, code: 'NOT_FOUND' } satisfies PlayerJoinResult);
         }
         if (session.state === 'FINISHED' || session.state === 'CANCELLED') {
@@ -217,6 +226,7 @@ export function attachSockets(app: FastifyInstance): void {
           rooms.get(prev.sessionId)?.detachSocket(prev.participantId, socket.id);
         }
 
+        app.joinLimiter.recordSuccess(ip);
         socket.data = {
           role: 'player',
           sessionId: session.id,

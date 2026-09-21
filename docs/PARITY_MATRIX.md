@@ -85,9 +85,9 @@ Remaining behavioural differences are numbered **B1–B18**, matching
 | B1 | No publish/version table — immutable session snapshot instead | Release A item 2 |
 | B2 | `VITE_EVENT_LOGO_URL` is build-time | Engine & scoring rows |
 | B3 | Late-join policy fixed (next question), not configurable | Engine & scoring rows |
-| B4 | Streak is display-only, no bonus points | Item 11 + engine rows |
-| B5 | Deterministic total order, no shared ranks | Item 11 + engine rows |
-| B6 | MULTI 500/correct (reference articles conflict 500 vs 1000) | Engine & scoring rows |
+| B4 | Streak is display-only, no bonus points — **rankings can differ from the reference** for streaky players (see `docs/SCORING.md` §5) | Item 11 + engine rows |
+| B5 | Deterministic total order `score ↓, correctCount ↓, totalResponseMs ↑, joinedAt ↑, id ↑`, no shared ranks (`docs/SCORING.md` §6) | Item 11 + engine rows |
+| B6 | MULTI 500 per correct option selected, any wrong pick → 0 (reference articles conflict 500 vs 1000; `docs/SCORING.md` §3) | Engine & scoring rows |
 | B7 | No skip-question / hide-leaderboard / auto-advance; fixed 5 s countdown | Items 10, 12 + engine rows |
 | B8 | Synthesized cues only, no lobby music | Engine & scoring rows |
 | B9 | Removed participant's nickname stays reserved | Item 8 |

@@ -10,6 +10,7 @@ import { hash as argonHash } from '@node-rs/argon2';
 import { getConfig, type AppConfig } from './env.js';
 import { createPrisma } from './lib/db.js';
 import { recordError } from './lib/errors.js';
+import { JoinLimiter } from './lib/join-limiter.js';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { PrismaClient } from './generated/prisma/client.js';
 import type { OrganizerModel } from './generated/prisma/models.js';
@@ -28,6 +29,7 @@ declare module 'fastify' {
     config: AppConfig;
     io: SocketIOServer;
     rooms: RoomManager;
+    joinLimiter: JoinLimiter;
   }
   interface FastifyRequest {
     organizerId?: string;
@@ -58,13 +60,23 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
             level: 'info',
             redact: ['req.headers.cookie', 'req.headers.authorization'],
           },
-    trustProxy: process.env.TRUST_PROXY === '1',
+    trustProxy: config.trustProxy,
     // Socket.IO keeps long-lived connections open; force-close them on shutdown
     // so app.close() doesn't hang waiting for polling/ws sockets to drain.
     forceCloseConnections: true,
   });
   app.decorate('prisma', prisma);
   app.decorate('config', config);
+  const joinLimiter = new JoinLimiter({
+    failPerMin: config.joinFailPerMin,
+    failPerHour: config.joinFailPerHour,
+    successPerMin: config.joinSuccessPerMin,
+    failWindowMs: config.joinFailWindowMs,
+  });
+  app.decorate('joinLimiter', joinLimiter);
+  app.addHook('preClose', async () => {
+    joinLimiter.dispose();
+  });
 
   await app.register(fastifyCookie);
   await app.register(fastifyRateLimit, {
